@@ -33,13 +33,13 @@ jobs:
       - name: Build APK
         run: |
           cd flutter_app
-          flutter build apk --release
+          flutter build apk
       
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: android-apk
-          path: flutter_app/build/app/outputs/flutter-apk/app-release.apk
+          path: flutter_app/build/app/outputs/apk/release/app-release.apk
 
   build-ios:
     runs-on: macos-latest
@@ -63,13 +63,14 @@ jobs:
           cd flutter_app
           flutter build ios --release --no-codesign
       
-      - name: Create IPA
+      - name: Create IPA Archive
         run: |
           cd flutter_app/build/ios/Release-iphoneos
-          mkdir -p Payload
-          mv Runner.app Payload/
-          zip -r app.ipa Payload/
-          mv app.ipa ../../../
+          mkdir -p output/Payload
+          cp -r Runner.app output/Payload/
+          cd output
+          zip -r -q app.ipa Payload/
+          mv app.ipa ../../..
       
       - name: Upload IPA
         uses: actions/upload-artifact@v4
