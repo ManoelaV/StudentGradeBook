@@ -1,53 +1,243 @@
-# 📚 Student GradeBook - Caderneta de Notas
+# 📚 Student Grade Book
 
-Aplicativo completo para gerenciar notas de alunos que funciona **100% offline** em PC e celular (Android).
+Um aplicativo Flutter completo para gerenciar notas de alunos. Funciona **100% offline** em Android e iOS com suporte a sincronização via Supabase.
 
 ## ✨ Funcionalidades
 
-- ✅ **Cadastro de Alunos** com foto e número de matrícula
-- ✅ **Gerenciamento de Notas** por matéria com cálculo automático de média
-- ✅ **Observações detalhadas** com mínimo 20 linhas disponíveis para texto
-- ✅ **Funciona 100% OFFLINE** - não precisa de internet
-- ✅ **Banco de dados local** SQLite
-- ✅ **Interface amigável** e responsiva
-- ✅ **Multiplataforma** - Windows, Linux, macOS e Android
+- ✅ **Gestão de Alunos** - Adicionar, visualizar e pesquisar alunos
+- ✅ **Notas por Disciplina** - Gerenciar notas de múltiplas disciplinas
+- ✅ **Armazenamento Local** - SQLite para funcionamento offline
+- ✅ **Sincronização Supabase** - Opcional para sincronizar entre dispositivos
+- ✅ **Pesquisa em Tempo Real** - Filtro de alunos durante a digitação
+- ✅ **Interface Intuitiva** - Design moderno com Material 3
+- ✅ **Multiplataforma** - Android e iOS
 
-## 📋 Requisitos
+## 🏗️ Estrutura do Projeto
 
-- Python 3.7 ou superior
-- Pillow (para processar imagens)
-
-## 🚀 Instalação e Execução
-
-### No PC (Windows/Linux/macOS)
-
-1. **Clone ou baixe este repositório**
-
-2. **Instale as dependências:**
-```bash
-pip install -r requirements.txt
+```
+StudentGradeBook/
+├── flutter_app/
+│   ├── lib/
+│   │   ├── main.dart                 # Ponto de entrada
+│   │   ├── screens/                  # Telas da aplicação
+│   │   │   ├── home_screen.dart      # Lista de alunos
+│   │   │   ├── add_student_screen.dart
+│   │   │   └── student_detail_screen.dart
+│   │   ├── providers/                # State management
+│   │   │   └── student_provider.dart
+│   │   └── services/
+│   │       └── database_service.dart
+│   ├── android/                      # Configurações Android
+│   ├── ios/                          # Configurações iOS
+│   └── pubspec.yaml                  # Dependências
+├── backend/                          # (Futuro) Backend com FastAPI
+└── README.md
 ```
 
-> **Nota:** Apenas Pillow é necessário! A interface usa Tkinter que já vem nativo do Python.
+## 📦 Dependências
 
-3. **Execute o aplicativo:**
-```bash
-python main.py
+```yaml
+# State Management
+provider: ^6.1.0
+
+# Local Database
+sqflite: ^2.3.0+1
+path_provider: ^2.1.0
+
+# Media
+image_picker: ^1.0.4
+image: ^4.1.1
+
+# Utilities
+intl: ^0.19.0
 ```
 
-### No Android
+## 🚀 Como Usar
 
-Para gerar o APK para Android, você precisa do Buildozer:
+### Pré-requisitos
 
-1. **Instale o Buildozer** (Linux ou WSL no Windows):
+- Flutter 3.41.1+
+- Dart 3.0.0+
+- Android SDK (para Android)
+- Xcode 15+ (para iOS)
+
+### Executar em Desenvolvimento
+
 ```bash
-pip install buildozer
+cd flutter_app
+flutter pub get
+flutter run
 ```
 
-2. **Configure o buildozer.spec** (já incluído no projeto)
+### Build para Production
 
-3. **Gere o APK:**
+**Android:**
 ```bash
+cd flutter_app
+flutter build apk --release
+# Arquivo: build/app/outputs/apk/release/app-release.apk
+```
+
+**iOS:**
+```bash
+cd flutter_app
+flutter build ios --release --no-codesign
+# Arquivo gerado em: build/ios/iphoneos/Runner.app
+```
+
+## 🧪 Testando
+
+### No Emulador Android
+
+```bash
+# Listar emuladores disponíveis
+flutter emulators
+
+# Iniciar emulador
+flutter emulators --launch Medium_Phone_API_36.1
+
+# Executar app
+flutter run
+```
+
+### Em Dispositivo Físico
+
+```bash
+# Ativar USB Debug no dispositivo
+# Conectar via USB
+
+# Listar dispositivos
+adb devices
+
+# Executar
+flutter run -d <device_id>
+```
+
+### Verificação de Funcionalidades
+
+- [ ] Adicionar novo aluno (nome, escola, série)
+- [ ] Pesquisar aluno pela barra de busca
+- [ ] Visualizar detalhes do aluno
+- [ ] Adicionar notas (disciplina + nota)
+- [ ] Remover notas
+- [ ] Dados persistem após reiniciar app
+
+## 🏪 Distribuição
+
+### Google Play Store (Android)
+
+1. **Gerar chave de assinatura:**
+```bash
+keytool -genkey -v -keystore student_grade_book.jks \
+  -keyalg RSA -keysize 2048 -validity 10000 \
+  -alias student_grade_book_key
+```
+
+2. **Configurar assinatura em** `android/app/build.gradle.kts`
+
+3. **Build AAB (App Bundle):**
+```bash
+flutter build appbundle --release
+```
+
+4. **Upload:**
+   - Acessar [Google Play Console](https://play.google.com/console)
+   - Crear nuevo app
+   - Upload do arquivo AAB
+
+### Apple App Store (iOS)
+
+1. **Requisitos:**
+   - Apple Developer Account
+   - macOS com Xcode 15+
+
+2. **Gerar certificados no** [Apple Developer](https://developer.apple.com)
+
+3. **Build IPA:**
+```bash
+flutter build ios --release
+cd ios && xcodebuild -workspace Runner.xcworkspace \
+  -scheme Runner -configuration Release -archivePath build/Runner.xcarchive
+```
+
+4. **Upload via Transporter App ou Xcode**
+
+## 🔧 Configuração do Banco de Dados
+
+O app usa **SQLite** por padrão (100% offline). Para opcional Supabase:
+
+1. Criar conta em [Supabase](https://supabase.com)
+2. Criar tabelas:
+   ```sql
+   CREATE TABLE students (
+     id TEXT PRIMARY KEY,
+     name TEXT NOT NULL,
+     school TEXT,
+     grade TEXT,
+     created_at TIMESTAMP
+   );
+   
+   CREATE TABLE grades (
+     id TEXT PRIMARY KEY,
+     student_id TEXT,
+     subject TEXT,
+     grade REAL,
+     created_at TIMESTAMP
+   );
+   ```
+3. Configurar credenciais em `student_provider.dart`
+
+## 🐛 Troubleshooting
+
+| Problema | Solução |
+|----------|---------|
+| **Java 11 requerido** | Instalar Java 17+: `java -version` |
+| **Build Android falha** | `flutter clean && flutter pub get` |
+| **CocoaPods erro (iOS)** | `cd ios && pod install && pod deintegrate` |
+| **Emulador não aparece** | Reiniciar: `adb kill-server && adb start-server` |
+
+## 📊 Status dos Builds
+
+- ✅ Android APK - Compilando com sucesso
+- ✅ iOS IPA - Compilando com sucesso
+- 🔄 CI/CD - GitHub Actions configurado
+
+Ver status em: [GitHub Actions](https://github.com/ManoelaV/StudentGradeBook/actions)
+
+## 📈 Roadmap
+
+- [ ] Cálculo automático de média
+- [ ] Exportar dados em PDF/CSV
+- [ ] Tema escuro (Dark Mode)
+- [ ] Notificações locais
+- [ ] Sincronização automática Supabase
+- [ ] Integração com Google Drive
+- [ ] Multi-idioma (PT, EN, ES)
+- [ ] Gráficos de desempenho
+
+## 🤝 Contribuindo
+
+1. Fork o projeto
+2. Crie uma branch (`git checkout -b feature/MelhoriaX`)
+3. Commit (`git commit -m 'Add: Melhoria X'`)
+4. Push (`git push origin feature/MelhoriaX`)
+5. Abra um Pull Request
+
+## 📄 Licença
+
+MIT License - veja [LICENSE](LICENSE)
+
+## 👨‍💼 Autor
+
+**Manuela V**  
+- GitHub: [@ManoelaV](https://github.com/ManoelaV)
+- Email: seu.email@exemplo.com
+
+---
+
+**Última atualização:** Fevereiro 2026  
+**Versão:** 1.0.0  
+**Status:** ✅ Em desenvolvimento ativo
 buildozer -v android debug
 ```
 
