@@ -63,17 +63,38 @@ jobs:
           cd flutter_app
           flutter build ios --release --no-codesign
       
+      - name: Debug - List build directory
+        run: |
+          echo "=== Checking build directory ==="
+          ls -la flutter_app/build/ios/ || echo "ios folder not found"
+          ls -la flutter_app/build/ios/Release-iphoneos/ || echo "Release-iphoneos not found"
+          ls -la flutter_app/build/ios/iphoneos/ || echo "iphoneos not found"
+      
       - name: Create IPA Archive
         run: |
-          cd flutter_app/build/ios/Release-iphoneos
-          mkdir -p output/Payload
-          cp -r Runner.app output/Payload/
-          cd output
+          cd flutter_app
+          # Try different possible paths
+          if [ -d "build/ios/Release-iphoneos" ]; then
+            echo "Found Release-iphoneos"
+            cd build/ios/Release-iphoneos
+          elif [ -d "build/ios/iphoneos" ]; then
+            echo "Found iphoneos"
+            cd build/ios/iphoneos
+          else
+            echo "ERROR: Could not find iOS build output"
+            exit 1
+          fi
+          
+          mkdir -p Payload
+          cp -r Runner.app Payload/
           zip -r -q app.ipa Payload/
-          mv app.ipa ../../..
+          mv app.ipa ../../../
+          cd ../../../
+          ls -la app.ipa
       
       - name: Upload IPA
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: ios-ipa
           path: flutter_app/app.ipa
