@@ -4,9 +4,11 @@ import '../database.dart';
 class StudentProvider extends ChangeNotifier {
   final DatabaseHelper _db = DatabaseHelper();
   List<Map<String, dynamic>> _students = [];
+  Map<String, dynamic>? _currentStudent;
   String _searchTerm = '';
 
   List<Map<String, dynamic>> get students => _getFilteredStudents();
+  Map<String, dynamic>? get currentStudent => _currentStudent;
   String get searchTerm => _searchTerm;
 
   Future<void> loadStudents() async {
@@ -47,6 +49,15 @@ class StudentProvider extends ChangeNotifier {
   Future<void> deleteStudent(int id) async {
     await _db.deleteStudent(id);
     await loadStudents();
+  }
+
+  Future<void> getStudentDetail(int studentId) async {
+    final students = await _db.getAllStudents();
+    _currentStudent = students.firstWhere(
+      (s) => s['id'] == studentId,
+      orElse: () => {},
+    );
+    notifyListeners();
   }
 
   Future<double> getStudentTotal(int studentId) async {

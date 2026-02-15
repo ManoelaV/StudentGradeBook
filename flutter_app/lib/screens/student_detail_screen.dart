@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 import '../providers/student_provider.dart';
 
 class StudentDetailScreen extends StatefulWidget {
-  final String studentId;
+  final int studentId;
 
   const StudentDetailScreen({Key? key, required this.studentId}) : super(key: key);
 
@@ -11,21 +13,182 @@ class StudentDetailScreen extends StatefulWidget {
   State<StudentDetailScreen> createState() => _StudentDetailScreenState();
 }
 
-class _StudentDetailScreenState extends State<StudentDetailScreen> {
+class _StudentDetailScreenState extends State<StudentDetailScreen> with SingleTickerProviderStateMixin {
   final _subjectController = TextEditingController();
   final _gradeController = TextEditingController();
+  final _maxGradeController = TextEditingController(text: '10');
+  final _observationController = TextEditingController();
+  final _nameController = TextEditingController();
+  final _schoolController = TextEditingController();
+  final _classController = TextEditingController();
+  final _regNumController = TextEditingController();
+  
+  late TabController _tabController;
+  List<Map<String, dynamic>> _grades = [];
+  List<Map<String, dynamic>> _observations = [];
+  bool _isEditingStudent = false;
+  String? _newPhotoPath;
+  
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
     super.initState();
-    Future.microtask(() => context.read<StudentProvider>().getStudentDetail(widget.studentId));
+    _tabController = TabController(length: 3, vsync: this);
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    await context.read<StudentProvider>().getStudentDetail(widget.studentId);
+    _grades = await context.read<StudentProvider>().getStudentGrades(widget.studentId);
+    _observations = await context.read<StudentProvider>().getStudentObservations(widget.studentId);
+    setState(() {});
   }
 
   @override
   void dispose() {
     _subjectController.dispose();
     _gradeController.dispose();
+    _maxGradeController.dispose();
+    _observationController.dispose();
+    _nameController.dispose();
+    _schoolController.dispose();
+    _classController.dispose();
+    _regNumController.dispose();
+    _tabController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+      if (image != null) {
+        setState(() {
+          _newPhotoPath = image.path;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao selecionar foto: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _takePhoto() async {
+    try {
+      final XFile? photo = await _picker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+      if (photo != null) {
+        setState(() {
+          _newPhotoPath = photo.path;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao tirar foto: $e')),
+        );
+      }
+    }
+  }
+
+  void _showPhotoOptions() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Galeria'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickImage();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Câmera'),
+              onTap: () {
+                Navigator.pop(context);
+                _takePhoto();
+              },
+            ),
+            if (_newPhotoPath != null)
+              ListTile(
+                leading: const Icon(Icons.delete, color: Colors.red),
+                title: const Text('Remover foto nova'),
+                onTap: () {
+                  Navigator.pop(context);
+                  setState(() {
+                    _newPhotoPath = null;
+                  });
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _initializeEditFields() {
+    final student = context.read<StudentProvider>().currentStudent;
+    if (student != null) {
+      _nameController.text = student['name'] ?? '';
+      _schoolController.text = student['school'] ?? '';
+      _classController.text = student['class'] ?? '';
+      _regNumController.text = student['registration_number'] ?? '';
+    }
+  }
+
+  void _saveStudentChanges() async {
+    if (_nameController.text.isEmpty || _schoolController.text.isEmpty || _classController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Preenchimento de nome, escola e série/turma é obrigatório')),
+      );
+      return;
+    }
+
+    try {
+      await context.read<StudentProvider>().updateStudent(
+        widget.studentId,
+        _nameController.text,
+        _regNumController.text.isEmpty ? null : _regNumController.text,
+        _schoolController.text,
+        _classController.text,
+        _newPhotoPath ?? context.read<StudentProvider>().currentStudent?['photo_path'],
+      );
+
+      setState(() {
+        _isEditingStudent = false;
+        _newPhotoPath = null;
+      });
+
+      await _loadData();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('✅ Dados do aluno atualizados com sucesso!')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('❌ Erro ao atualizar: $e')),
+        );
+      }
+    }
   }
 
   void _addGrade() async {
@@ -38,26 +201,68 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
 
     try {
       final grade = double.parse(_gradeController.text);
+      final maxGrade = double.parse(_maxGradeController.text);
+      final now = DateTime.now();
+      final date = '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}';
+      
       await context.read<StudentProvider>().addGrade(
-        studentId: widget.studentId,
-        subject: _subjectController.text,
-        grade: grade,
+        widget.studentId,
+        _subjectController.text,
+        grade,
+        maxGrade,
+        date,
       );
 
       _subjectController.clear();
       _gradeController.clear();
+      _maxGradeController.text = '10';
 
-      await context.read<StudentProvider>().getStudentDetail(widget.studentId);
+      await _loadData();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Nota adicionada com sucesso!')),
+          const SnackBar(content: Text('✅ Nota adicionada com sucesso!')),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao adicionar nota: $e')),
+          SnackBar(content: Text('❌ Erro: $e')),
+        );
+      }
+    }
+  }
+
+  void _addObservation() async {
+    if (_observationController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Digite um parecer')),
+      );
+      return;
+    }
+
+    try {
+      final now = DateTime.now();
+      final date = '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}';
+      
+      await context.read<StudentProvider>().addObservation(
+        widget.studentId,
+        _observationController.text,
+        date,
+      );
+
+      _observationController.clear();
+      await _loadData();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('✅ Parecer salvo com sucesso!')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('❌ Erro: $e')),
         );
       }
     }
@@ -68,6 +273,14 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Detalhes do Aluno'),
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(icon: Icon(Icons.person), text: 'Dados'),
+            Tab(icon: Icon(Icons.grade), text: 'Notas'),
+            Tab(icon: Icon(Icons.description), text: 'Pareceres'),
+          ],
+        ),
       ),
       body: Consumer<StudentProvider>(
         builder: (context, provider, _) {
@@ -77,152 +290,454 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
             return const Center(child: CircularProgressIndicator());
           }
 
-          return SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: double.infinity,
-                  color: Colors.blue,
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+          return TabBarView(
+            controller: _tabController,
+            children: [
+              // ABA 1: DADOS DO ALUNO
+              SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    if (!_isEditingStudent) ...[
+                      GestureDetector(
+                        onTap: _isEditingStudent ? null : () {
+                          _initializeEditFields();
+                          setState(() => _isEditingStudent = true);
+                        },
+                        child: Stack(
+                          alignment: Alignment.bottomRight,
+                          children: [
+                            CircleAvatar(
+                              radius: 60,
+                              backgroundImage: student['photo_path'] != null
+                                  ? FileImage(File(student['photo_path']))
+                                  : null,
+                              child: student['photo_path'] == null
+                                  ? const Icon(Icons.person, size: 60)
+                                  : null,
+                            ),
+                            Container(
+                              decoration: const BoxDecoration(
+                                color: Colors.blue,
+                                shape: BoxShape.circle,
+                              ),
+                              padding: const EdgeInsets.all(8),
+                              child: const Icon(Icons.edit, color: Colors.white, size: 20),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
                       Text(
                         student['name'] ?? '',
                         style: const TextStyle(
-                          color: Colors.white,
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Escola: ${student['school'] ?? ''}',
-                        style: const TextStyle(color: Colors.white70),
-                      ),
-                      Text(
-                        'Série: ${student['grade'] ?? ''}',
-                        style: const TextStyle(color: Colors.white70),
-                      ),
-                    ],
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Adicionar Nota',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _subjectController,
-                        decoration: InputDecoration(
-                          labelText: 'Disciplina',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          prefixIcon: const Icon(Icons.book),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _gradeController,
-                        keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
-                          labelText: 'Nota (0-10)',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          prefixIcon: const Icon(Icons.grade),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 24),
+                      _buildInfoCard('Escola', student['school'] ?? 'Não informada', Icons.school),
+                      _buildInfoCard('Série/Turma', student['class'] ?? 'Não informada', Icons.class_),
+                      _buildInfoCard('Matrícula', student['registration_number'] ?? 'Não informada', Icons.badge),
+                      const SizedBox(height: 24),
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
-                          onPressed: _addGrade,
-                          icon: const Icon(Icons.add),
-                          label: const Text('Adicionar Nota'),
+                          onPressed: () {
+                            _initializeEditFields();
+                            setState(() => _isEditingStudent = true);
+                          },
+                          icon: const Icon(Icons.edit),
+                          label: const Text('Editar Dados'),
                         ),
                       ),
-                    ],
-                  ),
-                ),
-                if ((student['grades'] as List?)?.isNotEmpty ?? false)
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Notas',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
+                    ] else ...[
+                      // Modo edição
+                      GestureDetector(
+                        onTap: _showPhotoOptions,
+                        child: Stack(
+                          alignment: Alignment.bottomRight,
+                          children: [
+                            CircleAvatar(
+                              radius: 60,
+                              backgroundImage: _newPhotoPath != null
+                                  ? FileImage(File(_newPhotoPath!))
+                                  : (student['photo_path'] != null
+                                      ? FileImage(File(student['photo_path']))
+                                      : null),
+                              child: (_newPhotoPath == null && student['photo_path'] == null)
+                                  ? const Icon(Icons.person, size: 60)
+                                  : null,
+                            ),
+                            Container(
+                              decoration: const BoxDecoration(
+                                color: Colors.blue,
+                                shape: BoxShape.circle,
+                              ),
+                              padding: const EdgeInsets.all(8),
+                              child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 12),
-                        ...(student['grades'] as List).map((gradeItem) {
-                          return Card(
-                            margin: const EdgeInsets.symmetric(vertical: 8),
-                            child: ListTile(
-                              title: Text(gradeItem['subject'] ?? ''),
-                              subtitle: Text('Nota: ${gradeItem['grade']}'),
-                              trailing: IconButton(
-                                icon: const Icon(Icons.delete, color: Colors.red),
-                                onPressed: () async {
-                                  try {
-                                    await context.read<StudentProvider>().deleteGrade(
-                                      studentId: widget.studentId,
-                                      gradeId: gradeItem['id'],
-                                    );
-
-                                    await context.read<StudentProvider>().getStudentDetail(widget.studentId);
-
-                                    if (mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Nota removida!')),
-                                      );
-                                    }
-                                  } catch (e) {
-                                    if (mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text('Erro ao remover nota: $e')),
-                                      );
-                                    }
-                                  }
-                                },
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Toque para alterar foto',
+                        style: TextStyle(color: Colors.grey, fontSize: 12),
+                      ),
+                      const SizedBox(height: 24),
+                      TextFormField(
+                        controller: _nameController,
+                        decoration: InputDecoration(
+                          labelText: 'Nome do Aluno',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                          prefixIcon: const Icon(Icons.person),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _schoolController,
+                        decoration: InputDecoration(
+                          labelText: 'Escola',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                          prefixIcon: const Icon(Icons.school),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _classController,
+                        decoration: InputDecoration(
+                          labelText: 'Série/Turma',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                          prefixIcon: const Icon(Icons.class_),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _regNumController,
+                        decoration: InputDecoration(
+                          labelText: 'Matrícula (opcional)',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                          prefixIcon: const Icon(Icons.badge),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () {
+                                setState(() {
+                                  _isEditingStudent = false;
+                                  _newPhotoPath = null;
+                                });
+                              },
+                              icon: const Icon(Icons.cancel),
+                              label: const Text('Cancelar'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.grey,
                               ),
                             ),
-                          );
-                        }).toList(),
-                      ],
-                    ),
-                  )
-                else
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Center(
-                      child: Column(
-                        children: const [
-                          Icon(Icons.grade, size: 80, color: Colors.grey),
-                          SizedBox(height: 16),
-                          Text('Nenhuma nota cadastrada'),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: _saveStudentChanges,
+                              icon: const Icon(Icons.save),
+                              label: const Text('Salvar'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
+                    ],
+                  ],
+                ),
+              ),
+
+              // ABA 2: NOTAS
+              SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Adicionar Nova Nota',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
-                  ),
-              ],
-            ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _subjectController,
+                      decoration: InputDecoration(
+                        labelText: 'Disciplina',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        prefixIcon: const Icon(Icons.book),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: TextField(
+                            controller: _gradeController,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: InputDecoration(
+                              labelText: 'Nota',
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                              prefixIcon: const Icon(Icons.grade),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: _maxGradeController,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: InputDecoration(
+                              labelText: 'Máx',
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _addGrade,
+                        icon: const Icon(Icons.add),
+                        label: const Text('Adicionar Nota'),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                    const Text(
+                      'Notas Cadastradas',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 12),
+                    if (_grades.isEmpty)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(32.0),
+                          child: Column(
+                            children: [
+                              Icon(Icons.grade, size: 80, color: Colors.grey),
+                              SizedBox(height: 16),
+                              Text('Nenhuma nota cadastrada'),
+                            ],
+                          ),
+                        ),
+                      )
+                    else
+                      ..._grades.map((grade) {
+                        final gradeValue = (grade['grade'] as num?)?.toDouble() ?? 0.0;
+                        final maxGrade = (grade['max_grade'] as num?)?.toDouble() ?? 10.0;
+                        final percentage = (gradeValue / maxGrade * 100).toStringAsFixed(1);
+                        
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: gradeValue >= maxGrade * 0.6 ? Colors.green : Colors.red,
+                              child: Text(
+                                gradeValue.toStringAsFixed(1),
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            title: Text(grade['subject'] ?? ''),
+                            subtitle: Text(
+                              'Nota: $gradeValue de $maxGrade ($percentage%) - ${grade['date'] ?? ''}',
+                            ),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              onPressed: () async {
+                                final confirm = await showDialog<bool>(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: const Text('Confirmar'),
+                                    content: const Text('Deseja realmente excluir esta nota?'),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(context, false),
+                                        child: const Text('Cancelar'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(context, true),
+                                        child: const Text('Excluir', style: TextStyle(color: Colors.red)),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                
+                                if (confirm == true) {
+                                  await context.read<StudentProvider>().deleteGrade(grade['id']);
+                                  await _loadData();
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Nota removida!')),
+                                    );
+                                  }
+                                }
+                              },
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                  ],
+                ),
+              ),
+
+              // ABA 3: PARECERES
+              SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Novo Parecer',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _observationController,
+                      maxLines: 20,
+                      minLines: 20,
+                      decoration: InputDecoration(
+                        hintText: 'Digite aqui o parecer descritivo do aluno...\n\n'
+                            'O parecer deve conter informações sobre:\n'
+                            '• Desempenho acadêmico\n'
+                            '• Comportamento em sala\n'
+                            '• Participação nas atividades\n'
+                            '• Relacionamento com colegas\n'
+                            '• Pontos fortes\n'
+                            '• Pontos a desenvolver\n'
+                            '• Recomendações',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _addObservation,
+                        icon: const Icon(Icons.save),
+                        label: const Text('Salvar Parecer'),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                    const Text(
+                      'Pareceres Anteriores',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 12),
+                    if (_observations.isEmpty)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(32.0),
+                          child: Column(
+                            children: [
+                              Icon(Icons.description, size: 80, color: Colors.grey),
+                              SizedBox(height: 16),
+                              Text('Nenhum parecer cadastrado'),
+                            ],
+                          ),
+                        ),
+                      )
+                    else
+                      ..._observations.map((obs) {
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 16),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.calendar_today, size: 16),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          obs['date'] ?? '',
+                                          style: const TextStyle(fontWeight: FontWeight.bold),
+                                        ),
+                                      ],
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.delete, color: Colors.red),
+                                      onPressed: () async {
+                                        final confirm = await showDialog<bool>(
+                                          context: context,
+                                          builder: (context) => AlertDialog(
+                                            title: const Text('Confirmar'),
+                                            content: const Text('Deseja realmente excluir este parecer?'),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () => Navigator.pop(context, false),
+                                                child: const Text('Cancelar'),
+                                              ),
+                                              TextButton(
+                                                onPressed: () => Navigator.pop(context, true),
+                                                child: const Text('Excluir', style: TextStyle(color: Colors.red)),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                        
+                                        if (confirm == true) {
+                                          await context.read<StudentProvider>().deleteObservation(obs['id']);
+                                          await _loadData();
+                                          if (mounted) {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(content: Text('Parecer removido!')),
+                                            );
+                                          }
+                                        }
+                                      },
+                                    ),
+                                  ],
+                                ),
+                                const Divider(),
+                                const SizedBox(height: 8),
+                                Text(
+                                  obs['observation'] ?? '',
+                                  style: const TextStyle(fontSize: 14),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                  ],
+                ),
+              ),
+            ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildInfoCard(String label, String value, IconData icon) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        leading: Icon(icon, color: Colors.blue),
+        title: Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        subtitle: Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
       ),
     );
   }

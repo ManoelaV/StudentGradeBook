@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 import '../providers/student_provider.dart';
 
 class AddStudentScreen extends StatefulWidget {
@@ -14,6 +16,8 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
   final _nameController = TextEditingController();
   final _schoolController = TextEditingController();
   final _gradeController = TextEditingController();
+  final ImagePicker _picker = ImagePicker();
+  String? _photoPath;
 
   @override
   void dispose() {
@@ -23,13 +27,98 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
     super.dispose();
   }
 
+  Future<void> _pickImage() async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+      if (image != null) {
+        setState(() {
+          _photoPath = image.path;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao selecionar foto: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _takePhoto() async {
+    try {
+      final XFile? photo = await _picker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+      if (photo != null) {
+        setState(() {
+          _photoPath = photo.path;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao tirar foto: $e')),
+        );
+      }
+    }
+  }
+
+  void _showPhotoOptions() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Galeria'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickImage();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Câmera'),
+              onTap: () {
+                Navigator.pop(context);
+                _takePhoto();
+              },
+            ),
+            if (_photoPath != null)
+              ListTile(
+                leading: const Icon(Icons.delete, color: Colors.red),
+                title: const Text('Remover foto'),
+                onTap: () {
+                  Navigator.pop(context);
+                  setState(() {
+                    _photoPath = null;
+                  });
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _submitForm() async {
     if (_formKey.currentState!.validate()) {
       try {
         await context.read<StudentProvider>().addStudent(
-          name: _nameController.text,
-          school: _schoolController.text,
-          grade: _gradeController.text,
+          _nameController.text,
+          null, // registration number
+          _schoolController.text.isEmpty ? null : _schoolController.text,
+          _gradeController.text.isEmpty ? null : _gradeController.text,
+          _photoPath,
         );
 
         if (mounted) {
@@ -57,6 +146,37 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
           key: _formKey,
           child: Column(
             children: [
+              // Foto do aluno
+              GestureDetector(
+                onTap: _showPhotoOptions,
+                child: Container(
+                  width: 150,
+                  height: 150,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.blue, width: 2),
+                  ),
+                  child: _photoPath != null
+                      ? ClipOval(
+                          child: Image.file(
+                            File(_photoPath!),
+                            fit: BoxFit.cover,
+                          ),
+                        )
+                      : Icon(
+                          Icons.add_a_photo,
+                          size: 50,
+                          color: Colors.grey[600],
+                        ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Toque para adicionar foto',
+                style: TextStyle(color: Colors.grey[600], fontSize: 12),
+              ),
+              const SizedBox(height: 24),
               TextFormField(
                 controller: _nameController,
                 decoration: InputDecoration(
@@ -94,7 +214,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
               TextFormField(
                 controller: _gradeController,
                 decoration: InputDecoration(
-                  labelText: 'Série',
+                  labelText: 'Série/Turma',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
