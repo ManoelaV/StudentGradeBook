@@ -7,6 +7,7 @@ import '../database.dart';
 import 'add_student_screen.dart';
 import 'student_detail_screen.dart';
 import 'pdf_import_screen.dart';
+import 'backup_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -175,6 +176,21 @@ class _HomeScreenState extends State<HomeScreen> {
                     context,
                     MaterialPageRoute(builder: (context) => const PDFImportScreen()),
                   ).then((_) => context.read<StudentProvider>().loadStudents());
+                },
+              ),
+              PopupMenuItem(
+                child: const Row(
+                  children: [
+                    Icon(Icons.cloud_upload, color: Colors.green),
+                    SizedBox(width: 12),
+                    Text('Backup e Sincronização'),
+                  ],
+                ),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const BackupScreen()),
+                  );
                 },
               ),
             ],
