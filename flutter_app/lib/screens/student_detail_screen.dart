@@ -536,60 +536,66 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> with SingleTi
                         ),
                       )
                     else
-                      ..._grades.map((grade) {
-                        final gradeValue = (grade['grade'] as num?)?.toDouble() ?? 0.0;
-                        final maxGrade = (grade['max_grade'] as num?)?.toDouble() ?? 10.0;
-                        final percentage = (gradeValue / maxGrade * 100).toStringAsFixed(1);
-                        
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          child: ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: gradeValue >= maxGrade * 0.6 ? Colors.green : Colors.red,
-                              child: Text(
-                                gradeValue.toStringAsFixed(1),
-                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                            title: Text(grade['subject'] ?? ''),
-                            subtitle: Text(
-                              'Nota: $gradeValue de $maxGrade ($percentage%) - ${grade['date'] ?? ''}',
-                            ),
-                            trailing: IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
-                              onPressed: () async {
-                                final confirm = await showDialog<bool>(
-                                  context: context,
-                                  builder: (context) => AlertDialog(
-                                    title: const Text('Confirmar'),
-                                    content: const Text('Deseja realmente excluir esta nota?'),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(context, false),
-                                        child: const Text('Cancelar'),
-                                      ),
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(context, true),
-                                        child: const Text('Excluir', style: TextStyle(color: Colors.red)),
-                                      ),
-                                    ],
+                      Column(
+                        children: [
+                          ..._grades.map((grade) {
+                            final gradeValue = (grade['grade'] as num?)?.toDouble() ?? 0.0;
+                            final maxGrade = (grade['max_grade'] as num?)?.toDouble() ?? 10.0;
+                            final percentage = (gradeValue / maxGrade * 100).toStringAsFixed(1);
+                            
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              child: ListTile(
+                                leading: CircleAvatar(
+                                  backgroundColor: gradeValue >= maxGrade * 0.6 ? Colors.green : Colors.red,
+                                  child: Text(
+                                    gradeValue.toStringAsFixed(1),
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                                   ),
-                                );
-                                
-                                if (confirm == true) {
-                                  await context.read<StudentProvider>().deleteGrade(grade['id']);
-                                  await _loadData();
-                                  if (mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Nota removida!')),
+                                ),
+                                title: Text(grade['subject'] ?? ''),
+                                subtitle: Text(
+                                  'Nota: $gradeValue de $maxGrade ($percentage%) - ${grade['date'] ?? ''}',
+                                ),
+                                trailing: IconButton(
+                                  icon: const Icon(Icons.delete, color: Colors.red),
+                                  onPressed: () async {
+                                    final confirm = await showDialog<bool>(
+                                      context: context,
+                                      builder: (context) => AlertDialog(
+                                        title: const Text('Confirmar'),
+                                        content: const Text('Deseja realmente excluir esta nota?'),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(context, false),
+                                            child: const Text('Cancelar'),
+                                          ),
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(context, true),
+                                            child: const Text('Excluir', style: TextStyle(color: Colors.red)),
+                                          ),
+                                        ],
+                                      ),
                                     );
-                                  }
-                                }
-                              },
-                            ),
-                          ),
-                        );
-                      }).toList(),
+                                    
+                                    if (confirm == true) {
+                                      await context.read<StudentProvider>().deleteGrade(grade['id']);
+                                      await _loadData();
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('Nota removida!')),
+                                        );
+                                      }
+                                    }
+                                  },
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                          const SizedBox(height: 16),
+                          _buildGradesSummary(),
+                        ],
+                      ),
                   ],
                 ),
               ),
@@ -738,6 +744,76 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> with SingleTi
         leading: Icon(icon, color: Colors.blue),
         title: Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
         subtitle: Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+      ),
+    );
+  }
+
+  Widget _buildSummaryRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 14,
+              color: Colors.grey,
+            ),
+          ),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Colors.blue,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGradesSummary() {
+    if (_grades.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final totalGrades = _grades.length;
+    final totalSum = _grades.fold<double>(0, (sum, grade) => sum + ((grade['grade'] as num?)?.toDouble() ?? 0.0));
+    final average = totalSum / totalGrades;
+    final maxGrade = _grades.map<double>((g) => (g['grade'] as num?)?.toDouble() ?? 0.0).reduce((a, b) => a > b ? a : b);
+    final minGrade = _grades.map<double>((g) => (g['grade'] as num?)?.toDouble() ?? 0.0).reduce((a, b) => a < b ? a : b);
+
+    return Card(
+      color: Colors.blue[50],
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.calculate, color: Colors.blue, size: 24),
+                SizedBox(width: 12),
+                Text(
+                  'Resumo das Notas',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _buildSummaryRow('Total de Notas:', '$totalGrades'),
+            _buildSummaryRow('Soma Total:', totalSum.toStringAsFixed(2)),
+            _buildSummaryRow('Média:', average.toStringAsFixed(2)),
+            _buildSummaryRow('Maior Nota:', maxGrade.toStringAsFixed(2)),
+            _buildSummaryRow('Menor Nota:', minGrade.toStringAsFixed(2)),
+          ],
+        ),
       ),
     );
   }

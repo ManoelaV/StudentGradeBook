@@ -115,6 +115,20 @@ class DatabaseHelper {
     return await db.delete(tableStudents, where: '$colId = ?', whereArgs: [id]);
   }
 
+  Future<int> deleteStudentsBySchool(String school) async {
+    Database db = await database;
+    return await db.delete(tableStudents, where: '$colSchool = ?', whereArgs: [school]);
+  }
+
+  Future<int> deleteStudentsBySchoolAndClass(String school, String className) async {
+    Database db = await database;
+    return await db.delete(
+      tableStudents,
+      where: '$colSchool = ? AND $colClass = ?',
+      whereArgs: [school, className],
+    );
+  }
+
   Future<double> getStudentTotal(int studentId) async {
     Database db = await database;
     List<Map<String, dynamic>> result = await db.rawQuery(

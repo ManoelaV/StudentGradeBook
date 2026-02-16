@@ -2,17 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
 import '../providers/student_provider.dart';
+import '../utils/pdf_generator.dart';
+import '../database.dart';
 import 'add_student_screen.dart';
 import 'student_detail_screen.dart';
+import 'pdf_import_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+  const HomeScreen({super.key});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final Set<String> _expandedSchools = {};
+  final Map<String, Set<String>> _expandedGrades = {};
+
   @override
   void initState() {
     super.initState();
@@ -39,12 +45,141 @@ class _HomeScreenState extends State<HomeScreen> {
     return grouped;
   }
 
+  void _showDeleteStudentDialog(
+    BuildContext context,
+    Map<String, dynamic> student,
+    StudentProvider provider,
+  ) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Excluir aluno?'),
+        content: Text('Tem certeza que deseja excluir ${student['name']}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await provider.deleteStudent(student['id']);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('✅ ${student['name']} removido')),
+                );
+              }
+            },
+            child: const Text('Excluir', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteGradeDialog(
+    BuildContext context,
+    String school,
+    String grade,
+    int studentCount,
+    StudentProvider provider,
+  ) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Excluir turma?'),
+        content: Text(
+          'Tem certeza que deseja excluir a turma $grade ($studentCount alunos)?'
+          '\n\n⚠️ Todos os alunos serão removidos!',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              final db = DatabaseHelper();
+              await db.deleteStudentsBySchoolAndClass(school, grade);
+              await provider.loadStudents();
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('✅ Turma $grade removida')),
+                );
+              }
+            },
+            child: const Text('Excluir', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteSchoolDialog(
+    BuildContext context,
+    String school,
+    StudentProvider provider,
+  ) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Excluir escola?'),
+        content: Text(
+          'Tem certeza que deseja excluir $school?'
+          '\n\n⚠️ Todos os alunos e turmas serão removidos!',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              final db = DatabaseHelper();
+              await db.deleteStudentsBySchool(school);
+              await provider.loadStudents();
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('✅ Escola $school removida')),
+                );
+              }
+            },
+            child: const Text('Excluir', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('📚 Caderneta de Notas'),
         elevation: 0,
+        actions: [
+          PopupMenuButton(
+            itemBuilder: (BuildContext context) => [
+              PopupMenuItem(
+                child: const Row(
+                  children: [
+                    Icon(Icons.upload_file, color: Colors.blue),
+                    SizedBox(width: 12),
+                    Text('Importar Alunos (PDF)'),
+                  ],
+                ),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const PDFImportScreen()),
+                  ).then((_) => context.read<StudentProvider>().loadStudents());
+                },
+              ),
+            ],
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -83,53 +218,94 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: groupedStudents.entries.map((schoolEntry) {
                     final school = schoolEntry.key;
                     final gradeMap = schoolEntry.value;
+                    final isSchoolExpanded = _expandedSchools.contains(school);
 
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          color: Colors.blue[700],
-                          child: Row(
-                            children: [
-                              const Icon(Icons.school, color: Colors.white, size: 20),
-                              const SizedBox(width: 8),
-                              Text(
-                                school,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
+                    if (!_expandedGrades.containsKey(school)) {
+                      _expandedGrades[school] = {};
+                    }
+
+                    return ExpansionTile(
+                      initiallyExpanded: false,
+                      title: Row(
+                        children: [
+                          const Icon(Icons.school, color: Colors.white, size: 20),
+                          const SizedBox(width: 12),
+                          Text(
+                            school,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                        ),
-                        ...gradeMap.entries.map((gradeEntry) {
-                          final grade = gradeEntry.key;
-                          final students = gradeEntry.value;
+                          const SizedBox(width: 12),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              '${gradeMap.values.fold<int>(0, (sum, grades) => sum + grades.length)}',
+                              style: const TextStyle(
+                                color: Colors.blue,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          const Spacer(),
+                          IconButton(
+                            icon: const Icon(Icons.delete, color: Colors.red),
+                            tooltip: 'Excluir escola',
+                            onPressed: () {
+                              _showDeleteSchoolDialog(context, school, provider);
+                            },
+                          ),
+                        ],
+                      ),
+                      backgroundColor: Colors.blue[50],
+                      collapsedBackgroundColor: Colors.blue[700],
+                      collapsedIconColor: Colors.white,
+                      iconColor: Colors.blue,
+                      onExpansionChanged: (expanded) {
+                        setState(() {
+                          if (expanded) {
+                            _expandedSchools.add(school);
+                          } else {
+                            _expandedSchools.remove(school);
+                          }
+                        });
+                      },
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Column(
+                            children: gradeMap.entries.map((gradeEntry) {
+                              final grade = gradeEntry.key;
+                              final students = gradeEntry.value;
+                              final gradeKey = '${school}_$grade';
+                              final isGradeExpanded = _expandedGrades[school]?.contains(grade) ?? false;
 
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                color: Colors.blue[100],
-                                child: Row(
+                              return ExpansionTile(
+                                initiallyExpanded: false,
+                                title: Row(
                                   children: [
                                     const Icon(Icons.class_, size: 18, color: Colors.blue),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      grade,
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.blue,
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        grade,
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.blue,
+                                        ),
                                       ),
                                     ),
-                                    const SizedBox(width: 8),
                                     Container(
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 8,
@@ -148,41 +324,93 @@ class _HomeScreenState extends State<HomeScreen> {
                                         ),
                                       ),
                                     ),
+                                    const SizedBox(width: 8),
+                                    IconButton(
+                                      icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                                      tooltip: 'Excluir turma',
+                                      onPressed: () {
+                                        _showDeleteGradeDialog(context, school, grade, students.length, provider);
+                                      },
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.file_download, color: Colors.green, size: 20),
+                                      tooltip: 'Exportar para PDF',
+                                      onPressed: () async {
+                                        try {
+                                          await PDFGenerator.generateClassGradesPDF(
+                                            school,
+                                            grade,
+                                            students,
+                                            DatabaseHelper(),
+                                          );
+                                          if (mounted) {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(content: Text('✅ PDF gerado com sucesso!')),
+                                            );
+                                          }
+                                        } catch (e) {
+                                          if (mounted) {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(content: Text('❌ Erro ao gerar PDF: $e')),
+                                            );
+                                          }
+                                        }
+                                      },
+                                    ),
                                   ],
                                 ),
-                              ),
-                              ...students.map((student) {
-                                return Card(
-                                  margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  child: ListTile(
-                                    leading: CircleAvatar(
-                                      backgroundImage: student['photo_path'] != null
-                                          ? FileImage(File(student['photo_path']))
-                                          : null,
-                                      child: student['photo_path'] == null
-                                          ? const Icon(Icons.person)
-                                          : null,
-                                    ),
-                                    title: Text(student['name'] ?? ''),
-                                    subtitle: Text(
-                                      '${student['school'] ?? 'Sem escola'} - ${student['class'] ?? 'Sem turma'}',
-                                    ),
-                                    onTap: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) =>
-                                              StudentDetailScreen(studentId: student['id'] as int),
+                                backgroundColor: Colors.blue[100],
+                                collapsedBackgroundColor: Colors.grey[100],
+                                onExpansionChanged: (expanded) {
+                                  setState(() {
+                                    if (expanded) {
+                                      _expandedGrades[school]?.add(grade);
+                                    } else {
+                                      _expandedGrades[school]?.remove(grade);
+                                    }
+                                  });
+                                },
+                                children: [
+                                  ...students.map((student) {
+                                    return Card(
+                                      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      child: ListTile(
+                                        leading: CircleAvatar(
+                                          backgroundImage: student['photo_path'] != null
+                                              ? FileImage(File(student['photo_path']))
+                                              : null,
+                                          child: student['photo_path'] == null
+                                              ? const Icon(Icons.person)
+                                              : null,
                                         ),
-                                      ).then((_) => context.read<StudentProvider>().loadStudents());
-                                    },
-                                  ),
-                                );
-                              }).toList(),
-                              const SizedBox(height: 8),
-                            ],
-                          );
-                        }).toList(),
+                                        title: Text(student['name'] ?? ''),
+                                        subtitle: Text(
+                                          '${student['school'] ?? 'Sem escola'} - ${student['class'] ?? 'Sem turma'}',
+                                        ),
+                                        trailing: IconButton(
+                                          icon: const Icon(Icons.delete, color: Colors.red),
+                                          tooltip: 'Excluir aluno',
+                                          onPressed: () {
+                                            _showDeleteStudentDialog(context, student, provider);
+                                          },
+                                        ),
+                                        onTap: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) =>
+                                                  StudentDetailScreen(studentId: student['id'] as int),
+                                            ),
+                                          ).then((_) => context.read<StudentProvider>().loadStudents());
+                                        },
+                                      ),
+                                    );
+                                  }).toList(),
+                                ],
+                              );
+                            }).toList(),
+                          ),
+                        ),
                       ],
                     );
                   }).toList(),
