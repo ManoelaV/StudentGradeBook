@@ -10,6 +10,7 @@ class DatabaseHelper {
   static const String tableStudents = 'students';
   static const String tableGrades = 'grades';
   static const String tableObservations = 'observations';
+  static const String tableAttendance = 'attendance';
 
   static const String colId = 'id';
   static const String colName = 'name';
@@ -70,6 +71,19 @@ class DatabaseHelper {
         student_id INTEGER NOT NULL,
         observation TEXT,
         date TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (student_id) REFERENCES $tableStudents($colId) ON DELETE CASCADE
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE $tableAttendance (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        student_id INTEGER NOT NULL,
+        school TEXT,
+        class TEXT,
+        date TEXT NOT NULL,
+        present INTEGER DEFAULT 1,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (student_id) REFERENCES $tableStudents($colId) ON DELETE CASCADE
       )
@@ -165,6 +179,69 @@ class DatabaseHelper {
       'student_id': studentId,
       'observation': observation,
       'date': date,
+  // Attendance methods
+  Future<List<String>> getDistinctSchools() async {
+    Database db = await database;
+    List<Map<String, dynamic>> result = await db.rawQuery(
+      'SELECT DISTINCT $colSchool FROM $tableStudents WHERE $colSchool IS NOT NULL ORDER BY $colSchool'
+    );
+    return result.map((e) => e['school'] as String).toList();
+  }
+
+  Future<List<String>> getClassesBySchool(String school) async {
+    Database db = await database;
+    List<Map<String, dynamic>> result = await db.rawQuery(
+      'SELECT DISTINCT $colClass FROM $tableStudents WHERE $colSchool = ? AND $colClass IS NOT NULL ORDER BY $colClass',
+      [school]
+    );
+    return result.map((e) => e['class'] as String).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> getStudentsBySchoolAndClass(String school, String className) async {
+    Database db = await database;
+    return await db.query(
+      tableStudents,
+      where: '$colSchool = ? AND $colClass = ?',
+      whereArgs: [school, className],
+      orderBy: colName,
+    );
+  }
+
+  Future<int> addAttendance(int studentId, String school, String className, String date, bool present) async {
+    Database db = await database;
+    return await db.insert(tableAttendance, {
+      'student_id': studentId,
+      'school': school,
+      'class': className,
+      'date': date,
+      'present': present ? 1 : 0,
+    });
+  }
+
+  Future<List<Map<String, dynamic>>> getAttendanceByClassAndDate(String school, String className, String date) async {
+    Database db = await database;
+    return await db.query(
+      tableAttendance,
+      where: 'school = ? AND class = ? AND date = ?',
+      whereArgs: [school, className, date],
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getAttendanceHistory(int studentId) async {
+    Database db = await database;
+    return await db.query(
+      tableAttendance,
+      where: 'student_id = ?',
+      whereArgs: [studentId],
+      orderBy: 'date DESC',
+    );
+  }
+
+  Future<int> deleteAttendanceRecord(int attendanceId) async {
+    Database db = await database;
+    return await db.delete(tableAttendance, where: 'id = ?', whereArgs: [attendanceId]);
+  }
+
     });
   }
 

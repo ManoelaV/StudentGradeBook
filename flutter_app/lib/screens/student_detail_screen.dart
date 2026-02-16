@@ -3,11 +3,13 @@ import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../providers/student_provider.dart';
+import '../providers/attendance_provider.dart';
+import 'attendance_history_screen.dart';
 
 class StudentDetailScreen extends StatefulWidget {
   final int studentId;
 
-  const StudentDetailScreen({Key? key, required this.studentId}) : super(key: key);
+  const StudentDetailScreen({super.key, required this.studentId});
 
   @override
   State<StudentDetailScreen> createState() => _StudentDetailScreenState();
@@ -34,7 +36,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> with SingleTi
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _loadData();
   }
 
@@ -279,6 +281,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> with SingleTi
             Tab(icon: Icon(Icons.person), text: 'Dados'),
             Tab(icon: Icon(Icons.grade), text: 'Notas'),
             Tab(icon: Icon(Icons.description), text: 'Pareceres'),
+            Tab(icon: Icon(Icons.assignment_turned_in), text: 'Chamada'),
           ],
         ),
       ),
@@ -591,7 +594,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> with SingleTi
                                 ),
                               ),
                             );
-                          }).toList(),
+                          }),
                           const SizedBox(height: 16),
                           _buildGradesSummary(),
                         ],
@@ -726,9 +729,193 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> with SingleTi
                             ),
                           ),
                         );
-                      }).toList(),
+                      }),
                   ],
                 ),
+              ),
+              // ABA 4: HISTÓRICO DE CHAMADA
+              Consumer<AttendanceProvider>(
+                builder: (context, attendanceProvider, _) {
+                  return FutureBuilder<List<Map<String, dynamic>>>(
+                    future: attendanceProvider.getAttendanceHistory(widget.studentId),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      
+                      if (snapshot.hasError) {
+                        return Center(
+                          child: Text('Erro ao carregar histórico: ${snapshot.error}'),
+                        );
+                      }
+                      
+                      final records = snapshot.data ?? [];
+                      
+                      if (records.isEmpty) {
+                        return Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.assignment, size: 64, color: Colors.grey[400]),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Nenhum registro de chamada',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+                      
+                      int presentCount = records.where((r) => r['present'] == 1).length;
+                      int absentCount = records.where((r) => r['present'] == 0).length;
+                      double attendancePercentage = (presentCount / records.length * 100);
+                      
+                      return ListView.builder(
+                        padding: const EdgeInsets.all(8),
+                        itemCount: records.length + 1,
+                        itemBuilder: (context, index) {
+                          if (index == 0) {
+                            return Container(
+                              margin: const EdgeInsets.all(8),
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.blue[50],
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.blue),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Row(
+                                    children: [
+                                      Icon(Icons.assessment, color: Colors.blue),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        'Resumo de Presença',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.blue,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                    children: [
+                                      Column(
+                                        children: [
+                                          Text(
+                                            'Presentes',
+                                            style: TextStyle(color: Colors.grey[600]),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            presentCount.toString(),
+                                            style: const TextStyle(
+                                              fontSize: 20,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.green,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      Column(
+                                        children: [
+                                          Text(
+                                            'Ausentes',
+                                            style: TextStyle(color: Colors.grey[600]),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            absentCount.toString(),
+                                            style: const TextStyle(
+                                              fontSize: 20,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.red,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      Column(
+                                        children: [
+                                          Text(
+                                            'Frequência',
+                                            style: TextStyle(color: Colors.grey[600]),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            '${attendancePercentage.toStringAsFixed(1)}%',
+                                            style: const TextStyle(
+                                              fontSize: 20,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.blue,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+                          
+                          final record = records[index - 1];
+                          final isPresent = record['present'] == 1;
+                          final date = record['date'] as String;
+                          
+                          return Container(
+                            margin: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                              color: isPresent ? Colors.green[50] : Colors.red[50],
+                              border: Border.all(
+                                color: isPresent ? Colors.green : Colors.red,
+                                width: 1.5,
+                              ),
+                            ),
+                            child: ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: isPresent ? Colors.green : Colors.red,
+                                child: Icon(
+                                  isPresent ? Icons.check : Icons.close,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              title: Text(
+                                isPresent ? 'Presente' : 'Ausente',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: isPresent ? Colors.green[700] : Colors.red[700],
+                                ),
+                              ),
+                              subtitle: Text(
+                                '${record['school'] ?? 'Sem escola'} - ${record['class'] ?? 'Sem turma'}',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                              trailing: Text(
+                                date,
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  );
+                },
               ),
             ],
           );

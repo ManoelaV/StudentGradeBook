@@ -8,6 +8,7 @@ import 'add_student_screen.dart';
 import 'student_detail_screen.dart';
 import 'pdf_import_screen.dart';
 import 'backup_screen.dart';
+import 'attendance_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -163,6 +164,21 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           PopupMenuButton(
             itemBuilder: (BuildContext context) => [
+              PopupMenuItem(
+                child: const Row(
+                  children: [
+                    Icon(Icons.assignment_turned_in, color: Colors.purple),
+                    SizedBox(width: 12),
+                    Text('Chamada'),
+                  ],
+                ),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const AttendanceScreen()),
+                  );
+                },
+              ),
               PopupMenuItem(
                 child: const Row(
                   children: [
@@ -421,7 +437,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                         },
                                       ),
                                     );
-                                  }).toList(),
+                                  }),
                                 ],
                               );
                             }).toList(),
