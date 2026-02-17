@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../providers/student_provider.dart';
+import '../database.dart';
 
 class AddStudentScreen extends StatefulWidget {
   const AddStudentScreen({super.key});
@@ -14,16 +15,51 @@ class AddStudentScreen extends StatefulWidget {
 class _AddStudentScreenState extends State<AddStudentScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _schoolController = TextEditingController();
-  final _gradeController = TextEditingController();
+  final _registrationController = TextEditingController();
   final ImagePicker _picker = ImagePicker();
+  late DatabaseHelper _database;
+  
+  List<Map<String, dynamic>> _schools = [];
+  List<Map<String, dynamic>> _classes = [];
+  int? _selectedSchoolId;
+  int? _selectedClassId;
   String? _photoPath;
+  String _evaluationType = 'Nota';
+
+  @override
+  void initState() {
+    super.initState();
+    _database = DatabaseHelper();
+    _loadSchools();
+  }
+
+  void _loadSchools() async {
+    final schools = await _database.getAllSchools();
+    setState(() {
+      _schools = schools;
+      if (_schools.isNotEmpty && _selectedSchoolId == null) {
+        _selectedSchoolId = _schools[0]['id'];
+      }
+    });
+    _loadClasses();
+  }
+
+  void _loadClasses() async {
+    if (_selectedSchoolId == null) return;
+    final classes = await _database.getClassesBySchoolId(_selectedSchoolId!);
+    setState(() {
+      _classes = classes;
+      _selectedClassId = null;
+      if (_classes.isNotEmpty) {
+        _selectedClassId = _classes[0]['id'];
+      }
+    });
+  }
 
   @override
   void dispose() {
     _nameController.dispose();
-    _schoolController.dispose();
-    _gradeController.dispose();
+    _registrationController.dispose();
     super.dispose();
   }
 
@@ -112,17 +148,28 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
 
   void _submitForm() async {
     if (_formKey.currentState!.validate()) {
+      if (_selectedClassId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Selecione uma turma')),
+        );
+        return;
+      }
+
       try {
-        await context.read<StudentProvider>().addStudent(
+        await _database.addStudentWithClass(
           _nameController.text,
-          null, // registration number
-          _schoolController.text.isEmpty ? null : _schoolController.text,
-          _gradeController.text.isEmpty ? null : _gradeController.text,
+          _registrationController.text,
+          _selectedClassId!,
           _photoPath,
+          evaluationType: _evaluationType,
         );
 
         if (mounted) {
+          await context.read<StudentProvider>().loadStudents();
           Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Aluno adicionado com sucesso!')),
+          );
         }
       } catch (e) {
         if (mounted) {
@@ -139,6 +186,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Adicionar Aluno'),
+        backgroundColor: Colors.blue,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -177,6 +225,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                 style: TextStyle(color: Colors.grey[600], fontSize: 12),
               ),
               const SizedBox(height: 24),
+              // Nome
               TextFormField(
                 controller: _nameController,
                 decoration: InputDecoration(
@@ -194,48 +243,181 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                 },
               ),
               const SizedBox(height: 16),
+              // Matrícula (obrigatória)
               TextFormField(
-                controller: _schoolController,
+                controller: _registrationController,
                 decoration: InputDecoration(
-                  labelText: 'Escola',
+                  labelText: 'Matrícula',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  prefixIcon: const Icon(Icons.school),
+                  prefixIcon: const Icon(Icons.badge),
                 ),
                 validator: (value) {
                   if (value?.isEmpty ?? true) {
-                    return 'Escola é obrigatória';
+                    return 'Matrícula é obrigatória';
                   }
                   return null;
                 },
               ),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _gradeController,
-                decoration: InputDecoration(
-                  labelText: 'Série/Turma',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
+              // Escola
+              _schools.isEmpty
+                  ? Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.amber),
+                        borderRadius: BorderRadius.circular(8),
+                        color: Colors.amber[50],
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.warning, color: Colors.amber[700]),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Nenhuma escola cadastrada.\nCrie uma escola primeiro.',
+                              style: TextStyle(color: Colors.amber[700]),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Escola',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        DropdownButton<int?>(
+                          value: _selectedSchoolId,
+                          isExpanded: true,
+                          items: _schools
+                              .map<DropdownMenuItem<int?>>((school) =>
+                                  DropdownMenuItem<int?>(
+                                    value: school['id'] as int,
+                                    child: Text(school['name'] as String),
+                                  ))
+                              .toList(),
+                          onChanged: (schoolId) {
+                            setState(() {
+                              _selectedSchoolId = schoolId;
+                            });
+                            _loadClasses();
+                          },
+                        ),
+                      ],
+                    ),
+              const SizedBox(height: 16),
+              // Tipo de Avaliação
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Tipo de Avaliação',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
                   ),
-                  prefixIcon: const Icon(Icons.layers),
-                ),
-                validator: (value) {
-                  if (value?.isEmpty ?? true) {
-                    return 'Série é obrigatória';
-                  }
-                  return null;
-                },
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: _evaluationType,
+                    decoration: InputDecoration(
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      prefixIcon: const Icon(Icons.assessment),
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'Nota',
+                        child: Text('Avaliado por Nota'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Parecer',
+                        child: Text('Avaliado por Parecer Descritivo (PD)'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() {
+                          _evaluationType = value;
+                        });
+                      }
+                    },
+                  ),
+                ],
               ),
+              if (_schools.isNotEmpty)
+                _classes.isEmpty
+                    ? Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.orange),
+                          borderRadius: BorderRadius.circular(8),
+                          color: Colors.orange[50],
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.info, color: Colors.orange[700]),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'Nenhuma turma na escola.\nCrie uma turma primeiro.',
+                                style: TextStyle(color: Colors.orange[700]),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Turma',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          DropdownButton<int?>(
+                            value: _selectedClassId,
+                            isExpanded: true,
+                            items: _classes
+                                .map<DropdownMenuItem<int?>>((classData) =>
+                                    DropdownMenuItem<int?>(
+                                      value: classData['id'] as int,
+                                      child: Text(
+                                        '${classData['name']} - ${classData['discipline'] ?? ''}',
+                                      ),
+                                    ))
+                                .toList(),
+                            onChanged: (classId) {
+                              setState(() {
+                                _selectedClassId = classId;
+                              });
+                            },
+                          ),
+                        ],
+                      ),
               const SizedBox(height: 32),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: _submitForm,
+                  onPressed: _schools.isEmpty ? null : _submitForm,
                   icon: const Icon(Icons.check),
                   label: const Text('Salvar Aluno'),
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 12),
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
                   ),
                 ),
               ),
@@ -244,5 +426,4 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
         ),
       ),
     );
-  }
-}
+  }}

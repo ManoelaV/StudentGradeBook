@@ -36,13 +36,13 @@ class StudentProvider extends ChangeNotifier {
     }).toList();
   }
 
-  Future<void> addStudent(String name, String? regNum, String? school, String? classname, String? photoPath) async {
-    await _db.addStudent(name, regNum, school, classname, photoPath);
+  Future<void> addStudent(String name, String? regNum, String? school, String? classname, String? photoPath, {String evaluationType = 'Nota'}) async {
+    await _db.addStudent(name, regNum, school, classname, photoPath, evaluationType: evaluationType);
     await loadStudents();
   }
 
-  Future<void> updateStudent(int id, String name, String? regNum, String? school, String? classname, String? photoPath) async {
-    await _db.updateStudent(id, name, regNum, school, classname, photoPath);
+  Future<void> updateStudent(int id, String name, String? regNum, String? school, String? classname, String? photoPath, {String? evaluationType}) async {
+    await _db.updateStudent(id, name, regNum, school, classname, photoPath, evaluationType: evaluationType);
     await loadStudents();
   }
 
@@ -72,8 +72,8 @@ class StudentProvider extends ChangeNotifier {
     return await _db.getStudentObservations(studentId);
   }
 
-  Future<void> addGrade(int studentId, String subject, double grade, double maxGrade, String date) async {
-    await _db.addGrade(studentId, subject, grade, maxGrade, date);
+  Future<void> addGrade(int studentId, String subject, double grade, double maxGrade, String date, {String gradeType = 'Prova'}) async {
+    await _db.addGrade(studentId, subject, grade, maxGrade, date, gradeType: gradeType);
     notifyListeners();
   }
 

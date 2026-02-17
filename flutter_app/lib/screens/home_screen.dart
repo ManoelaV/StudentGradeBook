@@ -9,6 +9,9 @@ import 'student_detail_screen.dart';
 import 'pdf_import_screen.dart';
 import 'backup_screen.dart';
 import 'attendance_screen.dart';
+import 'school_management_screen.dart';
+import 'class_management_screen.dart';
+import 'official_attendance_report_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -32,8 +35,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final Map<String, Map<String, List<Map<String, dynamic>>>> grouped = {};
 
     for (var student in students) {
-      final school = student['school'] ?? 'Sem escola';
-      final grade = student['class'] ?? 'Sem turma';
+      // Usar school_name (do JOIN) com fallback para school (campo antigo)
+      final school = student['school_name'] ?? student['school'] ?? 'Sem escola';
+      // Usar class_name (do JOIN) com fallback para class (campo antigo)
+      final grade = student['class_name'] ?? student['class'] ?? 'Sem turma';
 
       if (!grouped.containsKey(school)) {
         grouped[school] = {};
@@ -162,9 +167,40 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('📚 Caderneta de Notas'),
         elevation: 0,
         actions: [
-          PopupMenuButton(
-            itemBuilder: (BuildContext context) => [
-              PopupMenuItem(
+          PopupMenuButton<void>(
+            itemBuilder: (BuildContext context) => <PopupMenuEntry<void>>[
+              PopupMenuItem<void>(
+                child: const Row(
+                  children: [
+                    Icon(Icons.school, color: Colors.blue),
+                    SizedBox(width: 12),
+                    Text('Gerenciar Escolas'),
+                  ],
+                ),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const SchoolManagementScreen()),
+                  );
+                },
+              ),
+              PopupMenuItem<void>(
+                child: const Row(
+                  children: [
+                    Icon(Icons.class_, color: Colors.blue),
+                    SizedBox(width: 12),
+                    Text('Gerenciar Turmas'),
+                  ],
+                ),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const ClassManagementScreen()),
+                  );
+                },
+              ),
+              const PopupMenuDivider(),
+              PopupMenuItem<void>(
                 child: const Row(
                   children: [
                     Icon(Icons.assignment_turned_in, color: Colors.purple),
@@ -179,7 +215,22 @@ class _HomeScreenState extends State<HomeScreen> {
                   );
                 },
               ),
-              PopupMenuItem(
+              PopupMenuItem<void>(
+                child: const Row(
+                  children: [
+                    Icon(Icons.picture_as_pdf, color: Colors.red),
+                    SizedBox(width: 12),
+                    Text('Relatório Oficial (PDF)'),
+                  ],
+                ),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const OfficialAttendanceReportScreen()),
+                  );
+                },
+              ),
+              PopupMenuItem<void>(
                 child: const Row(
                   children: [
                     Icon(Icons.upload_file, color: Colors.blue),
@@ -194,7 +245,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ).then((_) => context.read<StudentProvider>().loadStudents());
                 },
               ),
-              PopupMenuItem(
+              PopupMenuItem<void>(
                 child: const Row(
                   children: [
                     Icon(Icons.cloud_upload, color: Colors.green),
@@ -417,7 +468,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                         ),
                                         title: Text(student['name'] ?? ''),
                                         subtitle: Text(
-                                          '${student['school'] ?? 'Sem escola'} - ${student['class'] ?? 'Sem turma'}',
+                                          '${student['school_name'] ?? student['school'] ?? 'Sem escola'} - ${student['class_name'] ?? student['class'] ?? 'Sem turma'}',
                                         ),
                                         trailing: IconButton(
                                           icon: const Icon(Icons.delete, color: Colors.red),
