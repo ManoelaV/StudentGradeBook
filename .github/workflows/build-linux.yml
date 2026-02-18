@@ -3,7 +3,7 @@ name: Build Linux Release
 on:
   push:
     tags:
-      - 'v*'
+      - 'v*-linux'
   workflow_dispatch:
 
 jobs:
