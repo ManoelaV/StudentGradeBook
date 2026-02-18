@@ -1,0 +1,43 @@
+# Configuração MSIX para criar um instalador Windows
+# Mais informações: https://github.com/leanflutter/msix/blob/main/README_PT.md
+
+# Nome da aplicação que aparecerá no menu Iniciar
+app_name: Student Grade Book
+
+# Publisher - pode ser seu nome ou nome da organização
+# Formato: CN=YourName
+publisher_name: CN=ManoelaStudentGradeBook
+
+# Identificador da sua aplicação (deve ser único)
+# Formato: author.publisher.classname
+app_package_id: StudentGradeBook
+
+# Nome de exibição na loja (máx 256 caracteres)
+display_name: Student Grade Book
+
+# Identidade do publicador (pode ser nome simples)
+publisher_display_name: Manoela
+
+# Versão do seu aplicativo (deve ser 4 números)
+msix_version: 1.0.0.0
+
+# Descrição breve
+short_description: Gerenciador de notas, frequência e histórico de aulas
+
+# Ícone do aplicativo - será usado o ícone padrão do Windows
+# Se quiser usar um ícone customizado, coloque aqui: assets/logo.png
+# logo_path: assets/logo.png
+
+# Certificado auto-assinado para teste (será criado automaticamente if não existir)
+certificate_path: windows/Certificate.pfx
+certificate_password: 12345
+
+# Idioma padrão
+language: pt-BR
+
+# Arquitetura (x64 para computadores modernos)
+architecture: x64
+
+# Pasta de instalação (será dentro de Program Files)
+install_folder_name: Student Grade Book
+

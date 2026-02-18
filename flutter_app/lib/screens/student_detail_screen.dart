@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../providers/student_provider.dart';
 import '../providers/attendance_provider.dart';
+import '../database.dart';
 
 class StudentDetailScreen extends StatefulWidget {
   final int studentId;
@@ -833,8 +834,36 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> with SingleTi
               // ABA 4: HISTÓRICO DE CHAMADA
               Consumer<AttendanceProvider>(
                 builder: (context, attendanceProvider, _) {
-                  return FutureBuilder<List<Map<String, dynamic>>>(
-                    future: attendanceProvider.getAttendanceHistory(widget.studentId),
+                  // Future que retorna {records, lessonContent}
+                  Future<Map<String, dynamic>> _getAttendanceAndLessons() async {
+                    final records = await attendanceProvider.getAttendanceHistory(widget.studentId);
+                    
+                    // Buscar dados do aluno do provider para obter school e class
+                    final studentProvider = context.read<StudentProvider>();
+                    final student = studentProvider.currentStudent;
+                    
+                    String schoolName = '';
+                    String className = '';
+                    
+                    if (student != null) {
+                      schoolName = student['school_name'] ?? student['school'] ?? '';
+                      className = student['class_name'] ?? student['class'] ?? '';
+                    }
+                    
+                    // Buscar lesson_content da classe
+                    final db = DatabaseHelper();
+                    final classId = await db.getClassIdByNames(schoolName, className);
+                    
+                    List<Map<String, dynamic>> lessonContent = [];
+                    if (classId != null) {
+                      lessonContent = await db.getLessonContentByClassId(classId);
+                    }
+                    
+                    return {'records': records, 'lessonContent': lessonContent};
+                  }
+                  
+                  return FutureBuilder<Map<String, dynamic>>(
+                    future: _getAttendanceAndLessons(),
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return const Center(child: CircularProgressIndicator());
@@ -846,7 +875,8 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> with SingleTi
                         );
                       }
                       
-                      final records = snapshot.data ?? [];
+                      final records = (snapshot.data?['records'] as List<Map<String, dynamic>>?) ?? [];
+                      final lessonContent = (snapshot.data?['lessonContent'] as List<Map<String, dynamic>>?) ?? [];
                       
                       if (records.isEmpty) {
                         return Center(
@@ -867,9 +897,38 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> with SingleTi
                         );
                       }
                       
-                      int presentCount = records.where((r) => r['present'] == 1).length;
-                      int absentCount = records.where((r) => r['present'] == 0).length;
-                      double attendancePercentage = (presentCount / records.length * 100);
+                      // Criar mapa de lessons_count por data
+                      final lessonCountByDate = <String, int>{};
+                      for (final lesson in lessonContent) {
+                        final date = lesson['date']?.toString();
+                        final count = lesson['lessons_count'] as int? ?? 1;
+                        if (date != null) {
+                          lessonCountByDate[date] = count;
+                        }
+                      }
+                      
+                      // Calcular presentes/ausentes considerando o lessons_count
+                      int presentCount = 0;
+                      int absentCount = 0;
+                      int totalLessons = 0;
+                      
+                      for (final record in records) {
+                        final date = record['date'] as String?;
+                        final present = record['present'] as int?;
+                        
+                        if (date != null && present != null) {
+                          final lessonCount = lessonCountByDate[date] ?? 1;
+                          
+                          if (present == 1) {
+                            presentCount += lessonCount;
+                          } else {
+                            absentCount += lessonCount;
+                          }
+                          totalLessons += lessonCount;
+                        }
+                      }
+                      
+                      double attendancePercentage = totalLessons > 0 ? (presentCount / totalLessons * 100) : 0;
                       
                       return ListView.builder(
                         padding: const EdgeInsets.all(8),
@@ -967,6 +1026,9 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> with SingleTi
                           final isPresent = record['present'] == 1;
                           final date = record['date'] as String;
                           
+                          // Obter lesson_count para este dia
+                          final lessonCount = lessonCountByDate[date] ?? 1;
+                          
                           return Container(
                             margin: const EdgeInsets.symmetric(
                               horizontal: 8,
@@ -988,12 +1050,37 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> with SingleTi
                                   color: Colors.white,
                                 ),
                               ),
-                              title: Text(
-                                isPresent ? 'Presente' : 'Ausente',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: isPresent ? Colors.green[700] : Colors.red[700],
-                                ),
+                              title: Row(
+                                children: [
+                                  Text(
+                                    isPresent ? 'Presente' : 'Ausente',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: isPresent ? Colors.green[700] : Colors.red[700],
+                                    ),
+                                  ),
+                                  if (lessonCount > 1) ...[
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: isPresent ? Colors.green : Colors.red,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        '${isPresent ? '' : lessonCount} aula${lessonCount > 1 ? 's' : ''}',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
                               subtitle: Text(
                                 '${record['school'] ?? 'Sem escola'} - ${record['class'] ?? 'Sem turma'}',

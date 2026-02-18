@@ -5,7 +5,7 @@ import 'package:path/path.dart';
 
 class DatabaseHelper {
   static const _databaseName = "student_gradebook.db";
-  static const _databaseVersion = 10;
+  static const _databaseVersion = 11;
 
   static const String tableSchools = 'schools';
   static const String tableClasses = 'classes';
@@ -234,6 +234,17 @@ class DatabaseHelper {
         // Coluna já existe, ignorar
       }
     }
+
+    if (oldVersion < 11) {
+      // Adicionar coluna year à tabela classes
+      try {
+        await db.execute(
+          'ALTER TABLE $tableClasses ADD COLUMN year INTEGER DEFAULT ${DateTime.now().year}',
+        );
+      } catch (e) {
+        // Coluna já existe, ignorar
+      }
+    }
   }
 
   Future _onCreate(Database db, int version) async {
@@ -257,6 +268,7 @@ class DatabaseHelper {
         professor TEXT,
         shift TEXT,
         code TEXT,
+        year INTEGER DEFAULT ${DateTime.now().year},
         planned_lessons INTEGER DEFAULT 0,
         academic_period TEXT DEFAULT "1º Trimestre",
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -668,7 +680,7 @@ class DatabaseHelper {
   }
 
   // Class management methods
-  Future<int> addClass(int schoolId, String name, String? period, String? discipline, String? professor, String? shift, String? code, int? plannedLessons, String? academicPeriod) async {
+  Future<int> addClass(int schoolId, String name, String? period, String? discipline, String? professor, String? shift, String? code, int? plannedLessons, String? academicPeriod, int? year) async {
     Database db = await database;
     return await db.insert(tableClasses, {
       'school_id': schoolId,
@@ -680,6 +692,7 @@ class DatabaseHelper {
       'code': code,
       'planned_lessons': plannedLessons ?? 0,
       'academic_period': academicPeriod ?? '1º Trimestre',
+      'year': year ?? DateTime.now().year,
     });
   }
 
@@ -694,7 +707,7 @@ class DatabaseHelper {
     return results.isNotEmpty ? results.first : null;
   }
 
-  Future<int> updateClass(int classId, int schoolId, String name, String? period, String? discipline, String? professor, String? shift, String? code, int? plannedLessons, String? academicPeriod) async {
+  Future<int> updateClass(int classId, int schoolId, String name, String? period, String? discipline, String? professor, String? shift, String? code, int? plannedLessons, String? academicPeriod, int? year) async {
     Database db = await database;
     return await db.update(tableClasses, {
       'school_id': schoolId,
@@ -706,6 +719,7 @@ class DatabaseHelper {
       'code': code,
       'planned_lessons': plannedLessons ?? 0,
       'academic_period': academicPeriod ?? '1º Trimestre',
+      'year': year ?? DateTime.now().year,
     }, where: 'id = ?', whereArgs: [classId]);
   }
 

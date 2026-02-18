@@ -28,6 +28,7 @@ dependencies:
   googleapis: ^11.4.0
   http: ^1.1.0
   url_launcher: ^6.2.5
+  msix: ^3.16.13
 
 dev_dependencies:
   flutter_test:
