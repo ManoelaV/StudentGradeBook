@@ -1,6 +1,244 @@
 # 📚 Student Grade Book
 
-Um aplicativo Flutter completo para gerenciar notas de alunos. Funciona **100% offline** em Android e iOS com suporte a sincronização via Supabase.
+Um aplicativo **Flutter completo** para gerenciar notas, frequência e aulas de alunos. Funciona **100% offline** em **Windows, Android e iOS**.
+
+## ✨ Funcionalidades
+
+- ✅ **Gestão de Escolas** - Múltiplas escolas
+- ✅ **Gestão de Turmas** - Cadastrar turmas com ano (ex: 2025/A9A)
+- ✅ **Gestão de Alunos** - Adicionar, editar e pesquisar alunos
+- ✅ **Notas** - Gerenciar notas por disciplina
+- ✅ **Frequência** - Registro de aulas e faltas com multiplicador de aulas por dia
+- ✅ **Conteúdo de Aulas** - Registrar o que foi ensinado em cada aula
+- ✅ **Histórico** - Visualizar aulas ministradas com datas e conteúdo
+- ✅ **Relatórios em PDF** - Gerar relatório oficial de frequência com "Registro de Aula"
+- ✅ **Armazenamento Local** - SQLite para funcionamento 100% offline
+- ✅ **Interface Intuitiva** - Design moderno com Material Design
+- ✅ **Multiplataforma** - Windows, Android e iOS
+
+## 📥 Como Instalar
+
+### Windows
+
+**Forma Mais Fácil:**
+
+1. Baixe o arquivo: **`setup_online_v2.bat`**
+2. Duplo clique no arquivo
+3. Ele faz download automático e instala
+4. Pronto! ✅
+
+**Link para download:** [GitHub Releases](https://github.com/ManoelaV/StudentGradeBook/releases)
+
+### Android
+
+Baixe o arquivo **`app-release.apk`** e instale no seu celular.
+
+### iOS
+
+Disponível em breve no App Store ou via TestFlight.
+
+## 🏗️ Estrutura do Projeto
+
+```
+StudentGradeBook/
+├── flutter_app/
+│   ├── lib/
+│   │   ├── main.dart
+│   │   ├── database.dart              # SQLite (v11)
+│   │   ├── screens/
+│   │   │   ├── home_screen.dart
+│   │   │   ├── school_management_screen.dart
+│   │   │   ├── class_management_screen.dart
+│   │   │   ├── add_student_screen.dart
+│   │   │   ├── student_detail_screen.dart
+│   │   │   ├── attendance_screen.dart
+│   │   │   └── official_attendance_report_screen.dart
+│   │   ├── providers/
+│   │   │   ├── student_provider.dart
+│   │   │   └── attendance_provider.dart
+│   │   └── utils/
+│   │       └── pdf_generator.dart
+│   ├── windows/                       # Suporte Windows
+│   ├── android/
+│   ├── ios/
+│   └── pubspec.yaml
+├── setup_online_v2.bat                # Instalador Windows
+├── StudentGradeBook_portable.zip      # Arquivo compactado
+└── README.md
+```
+
+## 🚀 Como Usar
+
+### Adicionar Escola
+
+1. Abre o app
+2. Clique em **"Gerenciar Escolas"**
+3. Preencha o nome da escola
+4. Clique em **"Adicionar"**
+
+### Adicionar Turma
+
+1. Clique em **"Gerenciar Turmas"**
+2. Selecione a escola
+3. Preencha:
+   - **Nome:** (ex: A9A)
+   - **Ano:** (ex: 2025, 2026)
+   - **Disciplina, Professor, Turno, Código**, etc.
+4. Clique em **"Adicionar"**
+
+### Adicionar Aluno
+
+1. Clique em **"Adicionar Aluno"**
+2. Selecione a escola e turma
+3. Preencha nome e matrícula
+4. Clique em **"Salvar"**
+
+### Registrar Aulas e Frequência
+
+1. Na home, clique em **"Registro de Chamada"**
+2. Selecione a turma e data
+3. Marque presença/falta dos alunos
+4. Digite o conteúdo da aula
+5. Clique em **"Registrar Aula"**
+
+### Gerar Relatório em PDF
+
+1. Clique em **"Relatório de Frequência"**
+2. Selecione escola, turma e período
+3. Clique em **"Gerar PDF"**
+4. Arquivo contém:
+   - Página 1: Relatório de frequência oficial
+   - Página 2: Registro de aulas com datas e conteúdo
+
+## 📦 Banco de Dados
+
+- **Sistema:** SQLite 3
+- **Versão Schema:** v11
+- **Tabelas:**
+  - `schools` - Escolas cadastradas
+  - `classes` - Turmas (com campo `year` para ano)
+  - `students` - Alunos
+  - `attendance` - Frequência
+  - `grades` - Notas
+  - `observations` - Observações
+  - `lesson_content` - Conteúdo das aulas
+
+## 🔧 Desenvolvimento
+
+### Pré-requisitos
+
+- Flutter 3.19+
+- Dart 3.0+
+- Git
+
+### Executar em Desenvolvimento
+
+```bash
+cd flutter_app
+flutter pub get
+flutter run
+```
+
+### Build Windows
+
+```bash
+cd flutter_app
+flutter build windows --release
+# Gera: build/windows/x64/runner/Release/student_grade_book.exe
+```
+
+### Build Android
+
+```bash
+cd flutter_app
+flutter build apk --release
+# Gera: build/app/outputs/apk/release/app-release.apk
+```
+
+### Build iOS
+
+```bash
+cd flutter_app
+flutter build ios --release
+```
+
+## 📝 Gerar Novo Instalador
+
+### 1. Compilar
+
+```bash
+cd flutter_app
+flutter build windows --release
+```
+
+### 2. Criar ZIP
+
+```powershell
+cd flutter_app
+# Execute este comando PowerShell:
+$source = "$PWD\build\windows\x64\runner\Release"
+$destination = "$PWD\StudentGradeBook_portable.zip"
+Add-Type -Assembly "System.IO.Compression.FileSystem"
+[System.IO.Compression.ZipFile]::CreateFromDirectory($source, $destination, [System.IO.Compression.CompressionLevel]::Optimal, $false)
+```
+
+### 3. Upload no GitHub
+
+1. Vá para [GitHub Releases](https://github.com/ManoelaV/StudentGradeBook/releases)
+2. Clique em **"Edit"** na release
+3. Delete o ZIP antigo
+4. Arraste o novo `StudentGradeBook_portable.zip`
+5. Clique em **"Update release"**
+
+### 4. Atualizar `setup_online_v2.bat` (se nova versão)
+
+Se a versão mudou (ex: v1.0.1), atualize:
+
+```batch
+set "VERSION=1.0.1"
+```
+
+## 🐛 Troubleshooting
+
+| Problema | Solução |
+|----------|---------|
+| **Instalador não faz download** | Verifique internet e se ZIP existe no GitHub |
+| **Erro ao extrair** | Verifique espaço em disco e permissões |
+| **App crasheia no start** | Verifique se todas as DLLs foram extraídas |
+| **Dados não salvam** | Verifique permissões na pasta de instalação |
+
+## 📈 Roadmap
+
+- [ ] Cálculo automático de média
+- [ ] Nota de Recuperação (Rec)
+- [ ] Sincronização com Google Drive
+- [ ] Importar alunos via CSV
+- [ ] Tema escuro (Dark Mode)
+- [ ] Multi-idioma (PT, EN, ES)
+- [ ] Gráficos de desempenho
+
+## 🤝 Contribuindo
+
+1. Fork o projeto
+2. Crie uma branch (`git checkout -b feature/MelhoriaN`)
+3. Commit suas mudanças (`git commit -m 'Add: Melhoria N'`)
+4. Push (`git push origin feature/MelhoriaN`)
+5. Abra um Pull Request
+
+## 📄 Licença
+
+MIT License - veja [LICENSE](LICENSE)
+
+## 👨‍💼 Autor
+
+**Manoela V**  
+GitHub: [@ManoelaV](https://github.com/ManoelaV)
+
+---
+
+**Última atualização:** Fevereiro 2026  
+**Versão Atual:** 1.0.0  
+**Status:** ✅ Em desenvolvimento ativo
 
 ## ✨ Funcionalidades
 
