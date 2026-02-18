@@ -443,7 +443,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> with SingleTi
                       ),
                       const SizedBox(height: 16),
                       DropdownButtonFormField<String>(
-                        value: _selectedEvaluationType,
+                        initialValue: _selectedEvaluationType,
                         decoration: InputDecoration(
                           labelText: 'Tipo de Avaliação',
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
@@ -550,7 +550,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> with SingleTi
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      value: _selectedGradeType,
+                      initialValue: _selectedGradeType,
                       decoration: InputDecoration(
                         labelText: 'Tipo de Avaliação',
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),

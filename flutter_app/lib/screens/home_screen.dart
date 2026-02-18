@@ -170,7 +170,7 @@ class _HomeScreenState extends State<HomeScreen> {
           PopupMenuButton<void>(
             itemBuilder: (BuildContext context) => <PopupMenuEntry<void>>[
               PopupMenuItem<void>(
-                child: const Row(
+                child: Row(
                   children: [
                     Icon(Icons.school, color: Colors.blue),
                     SizedBox(width: 12),
@@ -185,7 +185,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
               PopupMenuItem<void>(
-                child: const Row(
+                child: Row(
                   children: [
                     Icon(Icons.class_, color: Colors.blue),
                     SizedBox(width: 12),
@@ -201,7 +201,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const PopupMenuDivider(),
               PopupMenuItem<void>(
-                child: const Row(
+                child: Row(
                   children: [
                     Icon(Icons.assignment_turned_in, color: Colors.purple),
                     SizedBox(width: 12),
@@ -216,7 +216,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
               PopupMenuItem<void>(
-                child: const Row(
+                child: Row(
                   children: [
                     Icon(Icons.picture_as_pdf, color: Colors.red),
                     SizedBox(width: 12),
@@ -231,7 +231,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
               PopupMenuItem<void>(
-                child: const Row(
+                child: Row(
                   children: [
                     Icon(Icons.upload_file, color: Colors.blue),
                     SizedBox(width: 12),
@@ -246,7 +246,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
               PopupMenuItem<void>(
-                child: const Row(
+                child: Row(
                   children: [
                     Icon(Icons.cloud_upload, color: Colors.green),
                     SizedBox(width: 12),
@@ -301,7 +301,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: groupedStudents.entries.map((schoolEntry) {
                     final school = schoolEntry.key;
                     final gradeMap = schoolEntry.value;
-                    final isSchoolExpanded = _expandedSchools.contains(school);
 
                     if (!_expandedGrades.containsKey(school)) {
                       _expandedGrades[school] = {};
@@ -370,8 +369,6 @@ class _HomeScreenState extends State<HomeScreen> {
                             children: gradeMap.entries.map((gradeEntry) {
                               final grade = gradeEntry.key;
                               final students = gradeEntry.value;
-                              final gradeKey = '${school}_$grade';
-                              final isGradeExpanded = _expandedGrades[school]?.contains(grade) ?? false;
 
                               return ExpansionTile(
                                 initiallyExpanded: false,

@@ -327,7 +327,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                   ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
-                    value: _evaluationType,
+                    initialValue: _evaluationType,
                     decoration: InputDecoration(
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),

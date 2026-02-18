@@ -5,7 +5,7 @@ import 'package:path/path.dart';
 
 class DatabaseHelper {
   static const _databaseName = "student_gradebook.db";
-  static const _databaseVersion = 9;
+  static const _databaseVersion = 10;
 
   static const String tableSchools = 'schools';
   static const String tableClasses = 'classes';
@@ -224,6 +224,16 @@ class DatabaseHelper {
         // Coluna já existe, ignorar
       }
     }
+
+    if (oldVersion < 10) {
+      try {
+        await db.execute(
+          'ALTER TABLE $tableLessonContent ADD COLUMN lessons_count INTEGER DEFAULT 1',
+        );
+      } catch (e) {
+        // Coluna já existe, ignorar
+      }
+    }
   }
 
   Future _onCreate(Database db, int version) async {
@@ -314,6 +324,7 @@ class DatabaseHelper {
         class_id INTEGER NOT NULL,
         date TEXT NOT NULL,
         content TEXT NOT NULL,
+        lessons_count INTEGER DEFAULT 1,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (class_id) REFERENCES $tableClasses(id) ON DELETE CASCADE
       )
@@ -365,6 +376,30 @@ class DatabaseHelper {
       LEFT JOIN $tableSchools sch ON c.school_id = sch.id
       ORDER BY sch.name, c.name, s.name
     ''');
+  }
+
+  Future<List<Map<String, dynamic>>> getStudentsByClassId(int classId) async {
+    Database db = await database;
+    return await db.rawQuery('''
+      SELECT 
+        s.id,
+        s.name,
+        s.registration_number,
+        s.photo_path,
+        s.school,
+        s.class,
+        s.class_id,
+        s.evaluation_type,
+        COALESCE(c.name, s.class) as class_name,
+        COALESCE(sch.name, s.school) as school_name,
+        s.created_at,
+        s.updated_at
+      FROM $tableStudents s
+      LEFT JOIN $tableClasses c ON s.class_id = c.id
+      LEFT JOIN $tableSchools sch ON c.school_id = sch.id
+      WHERE s.class_id = ?
+      ORDER BY s.name
+    ''', [classId]);
   }
 
   Future<Map<String, dynamic>?> getStudentById(int id) async {
@@ -507,32 +542,41 @@ class DatabaseHelper {
 
   Future<int> addAttendance(int studentId, String school, String className, String date, bool present) async {
     Database db = await database;
-    return await db.insert(tableAttendance, {
+    print('DatabaseHelper.addAttendance - Insert: studentId=$studentId, school=$school, class=$className, date=$date, present=${present ? 1 : 0}');
+    final id = await db.insert(tableAttendance, {
       'student_id': studentId,
       'school': school,
       'class': className,
       'date': date,
       'present': present ? 1 : 0,
     });
+    print('Attendance record inserted with id: $id');
+    return id;
   }
 
   Future<List<Map<String, dynamic>>> getAttendanceByClassAndDate(String school, String className, String date) async {
     Database db = await database;
-    return await db.query(
+    print('DatabaseHelper.getAttendanceByClassAndDate - school=$school, class=$className, date=$date');
+    final results = await db.query(
       tableAttendance,
       where: 'school = ? AND class = ? AND date = ?',
       whereArgs: [school, className, date],
     );
+    print('Found ${results.length} attendance records');
+    return results;
   }
 
   Future<List<Map<String, dynamic>>> getAttendanceHistory(int studentId) async {
     Database db = await database;
-    return await db.query(
+    print('DatabaseHelper.getAttendanceHistory - studentId=$studentId');
+    final results = await db.query(
       tableAttendance,
       where: 'student_id = ?',
       whereArgs: [studentId],
       orderBy: 'date DESC',
     );
+    print('Found ${results.length} attendance records for student $studentId');
+    return results;
   }
 
   Future<List<Map<String, dynamic>>> getStudentAttendance(int studentId) async {
@@ -671,13 +715,39 @@ class DatabaseHelper {
   }
 
   // Lesson Content CRUD
-  Future<int> addLessonContent(int classId, String date, String content) async {
+  Future<int> addLessonContent(int classId, String date, String content, {int lessonsCount = 1}) async {
     Database db = await database;
     return await db.insert(tableLessonContent, {
       'class_id': classId,
       'date': date,
       'content': content,
+      'lessons_count': lessonsCount,
     });
+  }
+
+  Future<int> upsertLessonContent(int classId, String date, String content, {int lessonsCount = 1}) async {
+    Database db = await database;
+    final existing = await db.query(
+      tableLessonContent,
+      where: 'class_id = ? AND date = ?',
+      whereArgs: [classId, date],
+      limit: 1,
+    );
+
+    if (existing.isNotEmpty) {
+      final id = existing.first['id'] as int;
+      return await db.update(
+        tableLessonContent,
+        {
+          'content': content,
+          'lessons_count': lessonsCount,
+        },
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    }
+
+    return await addLessonContent(classId, date, content, lessonsCount: lessonsCount);
   }
 
   Future<List<Map<String, dynamic>>> getLessonContentByClassId(int classId) async {
@@ -690,11 +760,15 @@ class DatabaseHelper {
     );
   }
 
-  Future<int> updateLessonContent(int id, String date, String content) async {
+  Future<int> updateLessonContent(int id, String date, String content, {int? lessonsCount}) async {
     Database db = await database;
+    final updateData = <String, Object?>{'date': date, 'content': content};
+    if (lessonsCount != null) {
+      updateData['lessons_count'] = lessonsCount;
+    }
     return await db.update(
       tableLessonContent,
-      {'date': date, 'content': content},
+      updateData,
       where: 'id = ?',
       whereArgs: [id],
     );
