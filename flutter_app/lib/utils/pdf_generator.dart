@@ -362,25 +362,27 @@ class PDFGenerator {
   }) async {
     final pdf = pw.Document();
 
-    final attendanceDateKeys = <String>{};
-    for (final record in attendanceRecords) {
-      final date = record['date'] as String?;
-      if (date != null) {
-        attendanceDateKeys.add(date);
-      }
+    // Gerar TODAS as datas do intervalo, não apenas as que têm registro
+    final allDates = <String>[];
+    DateTime current = DateTime(startDate.year, startDate.month, startDate.day);
+    final end = DateTime(endDate.year, endDate.month, endDate.day);
+    
+    while (!current.isAfter(end)) {
+      final dateStr = '${current.year}-${current.month.toString().padLeft(2, '0')}-${current.day.toString().padLeft(2, '0')}';
+      allDates.add(dateStr);
+      current = current.add(const Duration(days: 1));
     }
-    final dateKeys = attendanceDateKeys.toList()..sort();
-    final effectiveDateKeys = dateKeys.isEmpty ? [''] : dateKeys;
 
     final expandedDateKeys = <String>[];
     final expandedDates = <DateTime?>[];
-    if (effectiveDateKeys.length == 1 && effectiveDateKeys.first.isEmpty) {
+    
+    if (allDates.isEmpty) {
       expandedDateKeys.add('');
       expandedDates.add(null);
     } else {
-      for (final key in effectiveDateKeys) {
+      for (final dateStr in allDates) {
         // Normalizar a chave para formato YYYY-MM-DD
-        final normalizedKey = _normalizeDateString(key);
+        final normalizedKey = _normalizeDateString(dateStr);
         var count = 1;
         
         // Procurar pela chave normalizada em lessonsByDate
@@ -396,13 +398,14 @@ class PDFGenerator {
           }
         }
         
-        final date = DateTime.tryParse(key);
+        final date = DateTime.tryParse(dateStr);
         for (var i = 0; i < count; i++) {
-          expandedDateKeys.add(key);
+          expandedDateKeys.add(dateStr);
           expandedDates.add(date);
         }
       }
     }
+    
     final attendanceByStudent = <int, Map<String, int>>{};
     for (final record in attendanceRecords) {
       final studentId = record['student_id'] as int?;
