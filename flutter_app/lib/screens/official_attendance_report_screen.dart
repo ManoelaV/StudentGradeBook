@@ -283,9 +283,13 @@ class _OfficialAttendanceReportScreenState
                               final studentId = student['id'] as int?;
                               if (studentId == null) continue;
                               final total = await _db.getStudentTotal(studentId);
+                              final rec = await _db.getStudentRecoveryGrade(studentId);
+                              final finalGrade = await _db.getStudentFinalGrade(studentId);
                               studentsWithTotals.add({
                                 ...student,
                                 'total': total,
+                                'rec': rec,
+                                'final_grade': finalGrade,
                               });
                             }
 

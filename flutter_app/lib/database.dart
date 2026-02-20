@@ -345,6 +345,20 @@ class DatabaseHelper {
 
   Future<int> addStudent(String name, String? regNum, String? school, String? classname, String? photoPath, {String evaluationType = 'Nota'}) async {
     Database db = await database;
+    
+    // Verificar se já existe um aluno com essa matrícula
+    if (regNum != null && regNum.isNotEmpty) {
+      final existing = await db.query(
+        tableStudents,
+        where: '$colRegNum = ?',
+        whereArgs: [regNum],
+      );
+      
+      if (existing.isNotEmpty) {
+        throw Exception('Já existe um aluno cadastrado com a matrícula: $regNum');
+      }
+    }
+    
     return await db.insert(tableStudents, {
       colName: name,
       colRegNum: regNum,
@@ -357,6 +371,20 @@ class DatabaseHelper {
 
   Future<int> addStudentWithClass(String name, String? regNum, int classId, String? photoPath, {String evaluationType = 'Nota'}) async {
     Database db = await database;
+    
+    // Verificar se já existe um aluno com essa matrícula
+    if (regNum != null && regNum.isNotEmpty) {
+      final existing = await db.query(
+        tableStudents,
+        where: '$colRegNum = ?',
+        whereArgs: [regNum],
+      );
+      
+      if (existing.isNotEmpty) {
+        throw Exception('Já existe um aluno cadastrado com a matrícula: $regNum');
+      }
+    }
+    
     return await db.insert(tableStudents, {
       colName: name,
       colRegNum: regNum,
@@ -422,6 +450,20 @@ class DatabaseHelper {
 
   Future<int> updateStudent(int id, String name, String? regNum, String? school, String? classname, String? photoPath, {String? evaluationType}) async {
     Database db = await database;
+    
+    // Verificar se já existe outra aluna com essa matrícula
+    if (regNum != null && regNum.isNotEmpty) {
+      final existing = await db.query(
+        tableStudents,
+        where: '$colRegNum = ? AND $colId != ?',
+        whereArgs: [regNum, id],
+      );
+      
+      if (existing.isNotEmpty) {
+        throw Exception('Já existe um aluno cadastrado com a matrícula: $regNum');
+      }
+    }
+    
     final updateData = {
       colName: name,
       colRegNum: regNum,
@@ -459,11 +501,29 @@ class DatabaseHelper {
 
   Future<double> getStudentTotal(int studentId) async {
     Database db = await database;
+    // Soma apenas notas que NÃO são recuperação
     List<Map<String, dynamic>> result = await db.rawQuery(
-      'SELECT SUM(grade) as total FROM $tableGrades WHERE student_id = ?',
-      [studentId],
+      'SELECT SUM(grade) as total FROM $tableGrades WHERE student_id = ? AND grade_type != ?',
+      [studentId, 'Recuperação'],
     );
     return result.isNotEmpty && result[0]['total'] != null ? (result[0]['total'] as num).toDouble() : 0.0;
+  }
+
+  Future<double> getStudentRecoveryGrade(int studentId) async {
+    Database db = await database;
+    // Pega APENAS a nota de recuperação (a mais recente se houver várias)
+    List<Map<String, dynamic>> result = await db.rawQuery(
+      'SELECT grade FROM $tableGrades WHERE student_id = ? AND grade_type = ? ORDER BY date DESC LIMIT 1',
+      [studentId, 'Recuperação'],
+    );
+    return result.isNotEmpty && result[0]['grade'] != null ? (result[0]['grade'] as num).toDouble() : 0.0;
+  }
+
+  Future<double> getStudentFinalGrade(int studentId) async {
+    // Nota final = maior entre (Nota normal) e (Recuperação)
+    final nota = await getStudentTotal(studentId);
+    final rec = await getStudentRecoveryGrade(studentId);
+    return nota > rec ? nota : (rec > 0 ? rec : nota);
   }
 
   Future<List<Map<String, dynamic>>> getStudentGrades(int studentId) async {

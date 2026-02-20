@@ -19,10 +19,14 @@ class PDFGenerator {
     for (var student in students) {
       final grades = await db.getStudentGrades(student['id']);
       final total = await db.getStudentTotal(student['id']);
+      final rec = await db.getStudentRecoveryGrade(student['id']);
+      final finalGrade = await db.getStudentFinalGrade(student['id']);
       studentsWithGrades.add({
         ...student,
         'grades': grades,
         'total': total,
+        'rec': rec,
+        'final_grade': finalGrade,
       });
     }
 
@@ -105,15 +109,35 @@ class PDFGenerator {
                       cellAlignment: pw.Alignment.centerLeft,
                     ),
                   pw.SizedBox(height: 8),
-                  pw.Text(
-                    parecerDescritivo 
-                      ? 'Total: PD' 
-                      : 'Total: ${student['total']?.toStringAsFixed(2) ?? '0.00'}',
-                    style: pw.TextStyle(
-                      fontSize: 12,
-                      fontWeight: pw.FontWeight.bold,
+                  if (parecerDescritivo)
+                    pw.Text(
+                      'Nota: PD | Rec: PD | Nota Final: PD',
+                      style: pw.TextStyle(
+                        fontSize: 12,
+                        fontWeight: pw.FontWeight.bold,
+                      ),
+                    )
+                  else
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text(
+                          'Nota: ${student['total']?.toStringAsFixed(2) ?? '0.00'}',
+                          style: const pw.TextStyle(fontSize: 11),
+                        ),
+                        pw.Text(
+                          'Rec: ${student['rec']?.toStringAsFixed(2) ?? '0.00'}',
+                          style: const pw.TextStyle(fontSize: 11),
+                        ),
+                        pw.Text(
+                          'Nota Final: ${student['final_grade']?.toStringAsFixed(2) ?? '0.00'}',
+                          style: pw.TextStyle(
+                            fontSize: 12,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
                   pw.Divider(),
                   pw.SizedBox(height: 16),
                 ],
@@ -142,6 +166,8 @@ class PDFGenerator {
     final pdf = pw.Document();
 
     final total = await db.getStudentTotal(student['id']);
+    final rec = await db.getStudentRecoveryGrade(student['id']);
+    final finalGrade = await db.getStudentFinalGrade(student['id']);
     final parecerDescritivo = (student['parecer_descritivo'] as int?) == 1;
 
     pdf.addPage(
@@ -217,15 +243,35 @@ class PDFGenerator {
                 ),
               ),
             pw.SizedBox(height: 10),
-            pw.Text(
-              parecerDescritivo 
-                ? 'Total: PD' 
-                : 'Total: ${total.toStringAsFixed(2)}',
-              style: pw.TextStyle(
-                fontSize: 14,
-                fontWeight: pw.FontWeight.bold,
+            if (parecerDescritivo)
+              pw.Text(
+                'Nota: PD | Rec: PD | Nota Final: PD',
+                style: pw.TextStyle(
+                  fontSize: 14,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              )
+            else
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    'Nota: ${total.toStringAsFixed(2)}',
+                    style: const pw.TextStyle(fontSize: 12),
+                  ),
+                  pw.Text(
+                    'Rec: ${rec.toStringAsFixed(2)}',
+                    style: const pw.TextStyle(fontSize: 12),
+                  ),
+                  pw.Text(
+                    'Nota Final: ${finalGrade.toStringAsFixed(2)}',
+                    style: pw.TextStyle(
+                      fontSize: 14,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                ],
               ),
-            ),
             pw.SizedBox(height: 30),
             pw.Text(
               'Observações',
@@ -519,6 +565,9 @@ class PDFGenerator {
                     ? 10.0
                     : ((pageWidth - fixedWidth) / expandedDates.length).clamp(4.0, 14.0);
                 
+                // Largura total da área de datas
+                final totalDateWidth = dateWidth * expandedDates.length;
+                
                 // Tamanho de fonte baseado na largura da coluna
                 final dateFontSize = dateWidth < 6.0 ? 5.0 : (dateWidth < 8.0 ? 6.0 : 7.0);
 
@@ -556,46 +605,77 @@ class PDFGenerator {
 
                 final rows = <pw.TableRow>[];
 
+                // Primeira linha - Datas em formato vertical (dia/mês)
                 rows.add(
                   pw.TableRow(
-                    children: [
-                      textCell('Matricula', weight: pw.FontWeight.bold),
-                      textCell('Aluno', weight: pw.FontWeight.bold),
-                      textCell('Nº', weight: pw.FontWeight.bold),
-                      ...List.generate(expandedDates.length, (index) {
-                        if (index == 0) {
-                          return textCell('Dias', weight: pw.FontWeight.bold);
-                        }
-                        return pw.Container();
-                      }),
-                      textCell('Nota', weight: pw.FontWeight.bold),
-                      textCell('Rec', weight: pw.FontWeight.bold),
-                      textCell('Nota Final', weight: pw.FontWeight.bold),
-                      textCell('Faltas', weight: pw.FontWeight.bold),
-                    ],
-                  ),
-                );
-
-                rows.add(
-                  pw.TableRow(
+                    decoration: const pw.BoxDecoration(
+                      border: pw.Border(
+                        bottom: pw.BorderSide.none,
+                      ),
+                    ),
                     children: [
                       pw.Container(),
-                      pw.Container(),
+                      textCell('Dias', weight: pw.FontWeight.bold),
                       pw.Container(),
                       ...expandedDates.map((d) {
-                        final label = d == null
-                            ? ''
-                            : '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}';
-                        return textCell(
-                          label,
-                          fontSize: dateFontSize,
-                          weight: pw.FontWeight.bold,
+                        if (d == null) {
+                          return pw.Container();
+                        }
+                        final dia = d.day.toString().padLeft(2, '0');
+                        final mes = d.month.toString().padLeft(2, '0');
+                        return pw.SizedBox(
+                          height: 40,
+                          child: pw.Container(
+                            alignment: pw.Alignment.center,
+                            child: pw.Transform.rotate(
+                              angle: -1.5707963, // -90 graus para ficar deitado na vertical
+                              child: pw.Row(
+                                mainAxisAlignment: pw.MainAxisAlignment.center,
+                                mainAxisSize: pw.MainAxisSize.min,
+                                children: [
+                                  pw.Text(
+                                    dia,
+                                    style: pw.TextStyle(fontSize: dateFontSize, fontWeight: pw.FontWeight.bold),
+                                  ),
+                                  pw.Text(
+                                    '/',
+                                    style: pw.TextStyle(fontSize: dateFontSize, fontWeight: pw.FontWeight.bold),
+                                  ),
+                                  pw.Text(
+                                    mes,
+                                    style: pw.TextStyle(fontSize: dateFontSize, fontWeight: pw.FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                         );
                       }),
                       pw.Container(),
                       pw.Container(),
                       pw.Container(),
                       pw.Container(),
+                    ],
+                  ),
+                );
+
+                // Segunda linha - Matricula, Aluno, Nº
+                rows.add(
+                  pw.TableRow(
+                    decoration: const pw.BoxDecoration(
+                      border: pw.Border(
+                        top: pw.BorderSide.none,
+                      ),
+                    ),
+                    children: [
+                      textCell('Matricula', weight: pw.FontWeight.bold),
+                      textCell('Aluno', weight: pw.FontWeight.bold),
+                      textCell('Nº', weight: pw.FontWeight.bold),
+                      ...List.generate(expandedDates.length, (index) => pw.Container()),
+                      textCell('Nota', weight: pw.FontWeight.bold),
+                      textCell('Rec', weight: pw.FontWeight.bold),
+                      textCell('Nota Final', weight: pw.FontWeight.bold),
+                      textCell('Faltas', weight: pw.FontWeight.bold),
                     ],
                   ),
                 );
@@ -612,8 +692,8 @@ class PDFGenerator {
                   final name = student['name']?.toString() ?? '';
                   final numero = (i + 1).toString().padLeft(2, '0');
                   final nota = (student['total'] as num?) ?? 0;
-                  const rec = 0;
-                  final notaFinal = nota;
+                  final rec = (student['rec'] as num?) ?? 0;
+                  final notaFinal = (student['final_grade'] as num?) ?? nota;
                   final faltas = studentId == null ? 0 : getAbsencesForStudent(studentId);
                   
                   // Verificar se o aluno é avaliado por parecer descritivo
@@ -649,34 +729,70 @@ class PDFGenerator {
                   );
                 }
 
-                rows.add(
-                  pw.TableRow(
-                    children: [
-                      pw.Container(),
-                      pw.Container(),
-                      pw.Container(),
-                      ...List.generate(expandedDateKeys.length, (index) {
-                        final isLast = index == expandedDateKeys.length - 1;
-                        return textCell(
-                          isLast ? 'Totais:' : '',
-                          align: pw.TextAlign.left,
-                          weight: isLast ? pw.FontWeight.bold : null,
-                          fontSize: 7,
-                          vPad: 2,
-                        );
-                      }),
-                      textCell(formatNumber(totalNota), fontSize: 7, vPad: 2),
-                      textCell(formatNumber(totalRec), fontSize: 7, vPad: 2),
-                      textCell(formatNumber(totalFinal), fontSize: 7, vPad: 2),
-                      textCell(totalFaltas.toString(), fontSize: 7, vPad: 2),
-                    ],
-                  ),
-                );
-
-                return pw.Table(
-                  columnWidths: columnWidths,
-                  border: pw.TableBorder.all(width: 0.5),
-                  children: rows,
+                // Retorna apenas a tabela sem a linha de totais
+                return pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Table(
+                      columnWidths: columnWidths,
+                      border: pw.TableBorder.all(width: 0.5),
+                      children: rows,
+                    ),
+                    // Linha de totais separada, alinhada com as colunas finais
+                    pw.Row(
+                      children: [
+                        pw.Container(
+                          width: matriculaWidth + nomeWidth + numeroWidth + totalDateWidth - 30,
+                          padding: const pw.EdgeInsets.symmetric(vertical: 2, horizontal: 2),
+                          alignment: pw.Alignment.centerRight,
+                          child: pw.Text(
+                            'Totais:',
+                            style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
+                          ),
+                        ),
+                        pw.Container(
+                          width: notaWidth,
+                          padding: const pw.EdgeInsets.symmetric(vertical: 2, horizontal: 2),
+                          decoration: pw.BoxDecoration(border: pw.Border.all(width: 0.5)),
+                          alignment: pw.Alignment.center,
+                          child: pw.Text(
+                            formatNumber(totalNota),
+                            style: const pw.TextStyle(fontSize: 8),
+                          ),
+                        ),
+                        pw.Container(
+                          width: recWidth,
+                          padding: const pw.EdgeInsets.symmetric(vertical: 2, horizontal: 2),
+                          decoration: pw.BoxDecoration(border: pw.Border.all(width: 0.5)),
+                          alignment: pw.Alignment.center,
+                          child: pw.Text(
+                            formatNumber(totalRec),
+                            style: const pw.TextStyle(fontSize: 8),
+                          ),
+                        ),
+                        pw.Container(
+                          width: finalWidth,
+                          padding: const pw.EdgeInsets.symmetric(vertical: 2, horizontal: 2),
+                          decoration: pw.BoxDecoration(border: pw.Border.all(width: 0.5)),
+                          alignment: pw.Alignment.center,
+                          child: pw.Text(
+                            formatNumber(totalFinal),
+                            style: const pw.TextStyle(fontSize: 8),
+                          ),
+                        ),
+                        pw.Container(
+                          width: faltasWidth,
+                          padding: const pw.EdgeInsets.symmetric(vertical: 2, horizontal: 2),
+                          decoration: pw.BoxDecoration(border: pw.Border.all(width: 0.5)),
+                          alignment: pw.Alignment.center,
+                          child: pw.Text(
+                            totalFaltas.toString(),
+                            style: const pw.TextStyle(fontSize: 8),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 );
               },
             ),
