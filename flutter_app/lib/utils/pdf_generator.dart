@@ -55,6 +55,8 @@ class PDFGenerator {
             pw.SizedBox(height: 20),
             ...studentsWithGrades.map((student) {
               final grades = student['grades'] as List<Map<String, dynamic>>;
+              final parecerDescritivo = (student['parecer_descritivo'] as int?) == 1;
+              
               return pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
@@ -68,6 +70,15 @@ class PDFGenerator {
                   pw.SizedBox(height: 4),
                   if (student['registration_number'] != null)
                     pw.Text('Matrícula: ${student['registration_number']}'),
+                  if (parecerDescritivo)
+                    pw.Text(
+                      'Avaliado por Parecer Descritivo (PD)',
+                      style: pw.TextStyle(
+                        fontSize: 10,
+                        fontStyle: pw.FontStyle.italic,
+                        color: PdfColors.blue700,
+                      ),
+                    ),
                   pw.SizedBox(height: 8),
                   if (grades.isEmpty)
                     pw.Text('Nenhuma nota registrada')
@@ -77,8 +88,8 @@ class PDFGenerator {
                       data: grades.map((grade) {
                         return [
                           grade['subject'] ?? '',
-                          grade['grade']?.toString() ?? '0',
-                          grade['max_grade']?.toString() ?? '0',
+                          parecerDescritivo ? 'PD' : (grade['grade']?.toString() ?? '0'),
+                          parecerDescritivo ? 'PD' : (grade['max_grade']?.toString() ?? '0'),
                           grade['date'] ?? '',
                           grade['grade_type'] ?? 'Prova',
                         ];
@@ -95,7 +106,9 @@ class PDFGenerator {
                     ),
                   pw.SizedBox(height: 8),
                   pw.Text(
-                    'Total: ${student['total']?.toStringAsFixed(2) ?? '0.00'}',
+                    parecerDescritivo 
+                      ? 'Total: PD' 
+                      : 'Total: ${student['total']?.toStringAsFixed(2) ?? '0.00'}',
                     style: pw.TextStyle(
                       fontSize: 12,
                       fontWeight: pw.FontWeight.bold,
@@ -129,6 +142,7 @@ class PDFGenerator {
     final pdf = pw.Document();
 
     final total = await db.getStudentTotal(student['id']);
+    final parecerDescritivo = (student['parecer_descritivo'] as int?) == 1;
 
     pdf.addPage(
       pw.MultiPage(
@@ -152,6 +166,15 @@ class PDFGenerator {
                   pw.Text('Nome: ${student['name'] ?? 'Sem nome'}'),
                   if (student['registration_number'] != null)
                     pw.Text('Matrícula: ${student['registration_number']}'),
+                  if (parecerDescritivo)
+                    pw.Text(
+                      'Avaliado por Parecer Descritivo (PD)',
+                      style: pw.TextStyle(
+                        fontSize: 11,
+                        fontStyle: pw.FontStyle.italic,
+                        color: PdfColors.blue700,
+                      ),
+                    ),
                   if (student['school'] != null)
                     pw.Text('Escola: ${student['school']}'),
                   if (student['class'] != null)
@@ -178,8 +201,8 @@ class PDFGenerator {
                 data: grades.map((grade) {
                   return [
                     grade['subject'] ?? '',
-                    grade['grade']?.toString() ?? '0',
-                    grade['max_grade']?.toString() ?? '0',
+                    parecerDescritivo ? 'PD' : (grade['grade']?.toString() ?? '0'),
+                    parecerDescritivo ? 'PD' : (grade['max_grade']?.toString() ?? '0'),
                     grade['date'] ?? '',
                     grade['grade_type'] ?? 'Prova',
                   ];
@@ -195,7 +218,9 @@ class PDFGenerator {
               ),
             pw.SizedBox(height: 10),
             pw.Text(
-              'Total: ${total.toStringAsFixed(2)}',
+              parecerDescritivo 
+                ? 'Total: PD' 
+                : 'Total: ${total.toStringAsFixed(2)}',
               style: pw.TextStyle(
                 fontSize: 14,
                 fontWeight: pw.FontWeight.bold,
@@ -548,9 +573,12 @@ class PDFGenerator {
                   final name = student['name']?.toString() ?? '';
                   final numero = (i + 1).toString().padLeft(2, '0');
                   final nota = (student['total'] as num?) ?? 0;
-                  final rec = 0;
+                  const rec = 0;
                   final notaFinal = nota;
                   final faltas = studentId == null ? 0 : getAbsencesForStudent(studentId);
+                  
+                  // Verificar se o aluno é avaliado por parecer descritivo
+                  final parecerDescritivo = (student['parecer_descritivo'] as int?) == 1;
 
                   totalNota += nota;
                   totalRec += rec;
@@ -573,9 +601,9 @@ class PDFGenerator {
                             weight: mark == 'F' ? pw.FontWeight.bold : null,
                           );
                         }),
-                        textCell(formatNumber(nota)),
-                        textCell(formatNumber(rec)),
-                        textCell(formatNumber(notaFinal)),
+                        textCell(parecerDescritivo ? 'PD' : formatNumber(nota)),
+                        textCell(parecerDescritivo ? 'PD' : formatNumber(rec)),
+                        textCell(parecerDescritivo ? 'PD' : formatNumber(notaFinal)),
                         textCell(faltas.toString()),
                       ],
                     ),
@@ -740,7 +768,7 @@ class PDFGenerator {
                           ),
                         ],
                       );
-                    }).toList(),
+                    }),
                   ],
                 ),
               ],
