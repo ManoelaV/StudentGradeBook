@@ -478,24 +478,60 @@ class PDFGenerator {
             pw.LayoutBuilder(
               builder: (context, constraints) {
                 final pageWidth = constraints?.maxWidth ?? PdfPageFormat.a4.landscape.availableWidth;
-                const fixedWidth = 60 + 160 + 22 + 30 + 30 + 40 + 30;
+                
+                // Ajustar larguras fixas baseado na quantidade de datas
+                final numDates = expandedDates.length;
+                double matriculaWidth = 50;
+                double nomeWidth = 140;
+                double numeroWidth = 18;
+                double notaWidth = 26;
+                double recWidth = 26;
+                double finalWidth = 35;
+                double faltasWidth = 26;
+                
+                // Reduzir colunas fixas se houver muitas datas
+                if (numDates > 20) {
+                  matriculaWidth = 40;
+                  nomeWidth = 110;
+                  numeroWidth = 16;
+                  notaWidth = 24;
+                  recWidth = 24;
+                  finalWidth = 32;
+                  faltasWidth = 24;
+                } else if (numDates > 15) {
+                  matriculaWidth = 45;
+                  nomeWidth = 120;
+                  numeroWidth = 17;
+                  notaWidth = 25;
+                  recWidth = 25;
+                  finalWidth = 34;
+                  faltasWidth = 25;
+                }
+                
+                final fixedWidth = matriculaWidth + nomeWidth + numeroWidth + 
+                                   notaWidth + recWidth + finalWidth + faltasWidth;
+                
+                // Calcular largura das colunas de data (mínimo 4.0, máximo 14.0)
                 final dateWidth = expandedDates.isEmpty
                     ? 10.0
-                    : ((pageWidth - fixedWidth) / expandedDates.length).clamp(6.0, 14.0);
+                    : ((pageWidth - fixedWidth) / expandedDates.length).clamp(4.0, 14.0);
+                
+                // Tamanho de fonte baseado na largura da coluna
+                final dateFontSize = dateWidth < 6.0 ? 5.0 : (dateWidth < 8.0 ? 6.0 : 7.0);
 
                 final columnWidths = <int, pw.TableColumnWidth>{
-                  0: const pw.FixedColumnWidth(60),
-                  1: const pw.FixedColumnWidth(160),
-                  2: const pw.FixedColumnWidth(22),
+                  0: pw.FixedColumnWidth(matriculaWidth),
+                  1: pw.FixedColumnWidth(nomeWidth),
+                  2: pw.FixedColumnWidth(numeroWidth),
                 };
                 for (var i = 0; i < expandedDates.length; i++) {
                   columnWidths[3 + i] = pw.FixedColumnWidth(dateWidth);
                 }
                 final baseIndex = 3 + expandedDates.length;
-                columnWidths[baseIndex + 0] = const pw.FixedColumnWidth(30);
-                columnWidths[baseIndex + 1] = const pw.FixedColumnWidth(30);
-                columnWidths[baseIndex + 2] = const pw.FixedColumnWidth(40);
-                columnWidths[baseIndex + 3] = const pw.FixedColumnWidth(30);
+                columnWidths[baseIndex + 0] = pw.FixedColumnWidth(notaWidth);
+                columnWidths[baseIndex + 1] = pw.FixedColumnWidth(recWidth);
+                columnWidths[baseIndex + 2] = pw.FixedColumnWidth(finalWidth);
+                columnWidths[baseIndex + 3] = pw.FixedColumnWidth(faltasWidth);
 
                 pw.Widget textCell(
                   String text, {
@@ -549,7 +585,7 @@ class PDFGenerator {
                             : '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}';
                         return textCell(
                           label,
-                          fontSize: 7,
+                          fontSize: dateFontSize,
                           weight: pw.FontWeight.bold,
                         );
                       }),
@@ -597,7 +633,7 @@ class PDFGenerator {
                           final mark = present == null ? '' : (present == 0 ? 'F' : '.');
                           return textCell(
                             mark,
-                            fontSize: 9,
+                            fontSize: dateFontSize + 1.5,
                             weight: mark == 'F' ? pw.FontWeight.bold : null,
                           );
                         }),
